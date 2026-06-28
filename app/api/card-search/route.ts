@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 100;
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 250;
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -38,8 +39,11 @@ export async function GET(request: Request) {
     ? Number.parseInt(pageSizeParam, 10)
     : DEFAULT_PAGE_SIZE;
 
-  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 250) {
-    return NextResponse.json({ error: "Invalid pageSize." }, { status: 400 });
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
+    return NextResponse.json(
+      { error: `Invalid pageSize. Must be between 1 and ${MAX_PAGE_SIZE}.` },
+      { status: 400 },
+    );
   }
 
   try {

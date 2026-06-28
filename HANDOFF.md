@@ -15,12 +15,14 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - **Listing from collection:** searchable picker prefills form; snapshot on insert + optional `collection_item_id`
 - **Language:** optional dropdown on collection + listings (13 values); snapshotted when creating listings
 - **Pokémon TCG API (Phase A):** `lib/pokemon-tcg.ts`, `GET /api/card-search?q=...` (auth required); optional `POKEMON_TCG_API_KEY`; DB columns `tcg_api_card_id`, `card_number`, `set_id`; no images stored in DB
-- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`
+- **Pokémon TCG API (Phase B):** `CardSearchCombobox` + `AddCollectionItemForm` on `/my-collection` — search/manual toggle for cards; sealed stays manual
+- **Pokémon TCG API (Phase C):** selected official card saved on create with API metadata; list shows badges
+- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`, `CardSearchCombobox`, `AddCollectionItemForm`
 - **Stack:** Next.js 16 App Router, React 19, Tailwind v4, Supabase SSR
 
 ## Build next (priority order)
 
-1. **Pokémon TCG API Phase B** — My Collection autocomplete UI
+1. **Pokémon TCG API Phase D** — propagate collection API fields to listings
 2. **Join event** — use `events.join_code`
 
 ## Supabase schema
@@ -52,7 +54,9 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 | Listing from collection | Done |
 | Language support | Done |
 | Pokémon TCG API Phase A | Done |
-| Pokémon TCG API Phase B–D | Not started |
+| Pokémon TCG API Phase B | Done |
+| Pokémon TCG API Phase C | Done |
+| Pokémon TCG API Phase D | Not started |
 | Join event | Not started |
 
 ## Tips for the next chat

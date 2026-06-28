@@ -21,6 +21,50 @@ function getOptionalText(formData: FormData, name: string) {
   return trimmed ? trimmed : null;
 }
 
+function isValidTcgApiCardId(value: string) {
+  return /^[a-zA-Z0-9-]+$/.test(value) && value.length <= 64;
+}
+
+function parseOptionalApiFields(formData: FormData, itemKind: ItemKind):
+  | { error: string }
+  | {
+      tcg_api_card_id: string | null;
+      card_number: string | null;
+      set_id: string | null;
+    } {
+  if (itemKind === "sealed") {
+    return {
+      tcg_api_card_id: null,
+      card_number: null,
+      set_id: null,
+    };
+  }
+
+  const tcgApiCardId = getOptionalText(formData, "tcg_api_card_id");
+  const cardNumber = getOptionalText(formData, "card_number");
+  const setId = getOptionalText(formData, "set_id");
+
+  const hasAnyApiField = Boolean(tcgApiCardId || cardNumber || setId);
+
+  if (!hasAnyApiField) {
+    return {
+      tcg_api_card_id: null,
+      card_number: null,
+      set_id: null,
+    };
+  }
+
+  if (!tcgApiCardId || !isValidTcgApiCardId(tcgApiCardId)) {
+    return { error: "Please select a valid official card." };
+  }
+
+  return {
+    tcg_api_card_id: tcgApiCardId,
+    card_number: cardNumber,
+    set_id: setId,
+  };
+}
+
 function parseCollectionFields(formData: FormData):
   | { error: string }
   | {
@@ -33,6 +77,9 @@ function parseCollectionFields(formData: FormData):
         notes: string | null;
         language: string | null;
         quantity: number;
+        tcg_api_card_id: string | null;
+        card_number: string | null;
+        set_id: string | null;
       };
     } {
   const itemKind = formData.get("item_kind");
@@ -61,6 +108,12 @@ function parseCollectionFields(formData: FormData):
     return { error: "Please select a valid language." };
   }
 
+  const apiFields = parseOptionalApiFields(formData, itemKind);
+
+  if ("error" in apiFields) {
+    return apiFields;
+  }
+
   return {
     data: {
       item_kind: itemKind,
@@ -71,6 +124,7 @@ function parseCollectionFields(formData: FormData):
       notes: getOptionalText(formData, "notes"),
       language: languageValue,
       quantity,
+      ...apiFields,
     },
   };
 }
@@ -129,9 +183,16 @@ export async function updateCollectionItem(
     );
   }
 
+  const {
+    tcg_api_card_id: _tcgApiCardId,
+    card_number: _cardNumber,
+    set_id: _setId,
+    ...editableFields
+  } = parsed.data;
+
   const { error } = await supabase
     .from("collection_items")
-    .update(parsed.data)
+    .update(editableFields)
     .eq("id", itemId)
     .eq("user_id", user.id);
 

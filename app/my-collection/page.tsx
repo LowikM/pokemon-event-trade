@@ -5,6 +5,7 @@ import {
   deleteCollectionItem,
   updateCollectionItem,
 } from "@/app/my-collection/actions";
+import { AddCollectionItemForm } from "@/components/AddCollectionItemForm";
 import { LanguageSelect } from "@/components/LanguageSelect";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,6 +20,9 @@ type CollectionItem = {
   condition: string | null;
   notes: string | null;
   language: string | null;
+  tcg_api_card_id: string | null;
+  card_number: string | null;
+  set_id: string | null;
   quantity: number;
   created_at: string;
   updated_at: string;
@@ -60,7 +64,7 @@ export default async function MyCollectionPage({
   const { data, error } = await supabase
     .from("collection_items")
     .select(
-      "id, item_kind, card_name, card_ref, set_name, condition, notes, language, quantity, created_at, updated_at",
+      "id, item_kind, card_name, card_ref, set_name, condition, notes, language, tcg_api_card_id, card_number, set_id, quantity, created_at, updated_at",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -90,104 +94,7 @@ export default async function MyCollectionPage({
           <h2 className="text-lg font-semibold tracking-tight">
             Add to collection
           </h2>
-          <form action={createCollectionItem} className="mt-4 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="create-item-kind" className="text-sm font-medium">
-                  Item kind <span className="text-red-600">*</span>
-                </label>
-                <select
-                  id="create-item-kind"
-                  name="item_kind"
-                  required
-                  defaultValue=""
-                  className={inputClassName}
-                >
-                  <option value="" disabled>
-                    Select kind
-                  </option>
-                  <option value="card">Card</option>
-                  <option value="sealed">Sealed</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="create-quantity" className="text-sm font-medium">
-                  Quantity <span className="text-red-600">*</span>
-                </label>
-                <input
-                  id="create-quantity"
-                  name="quantity"
-                  type="number"
-                  min={1}
-                  defaultValue={1}
-                  required
-                  className={inputClassName}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="create-card-name" className="text-sm font-medium">
-                Card name <span className="text-red-600">*</span>
-              </label>
-              <input
-                id="create-card-name"
-                name="card_name"
-                type="text"
-                required
-                className={inputClassName}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="create-set-name" className="text-sm font-medium">
-                  Set name
-                </label>
-                <input
-                  id="create-set-name"
-                  name="set_name"
-                  type="text"
-                  className={inputClassName}
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="create-condition" className="text-sm font-medium">
-                  Condition
-                </label>
-                <input
-                  id="create-condition"
-                  name="condition"
-                  type="text"
-                  className={inputClassName}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="create-language" className="text-sm font-medium">
-                Language
-              </label>
-              <LanguageSelect
-                id="create-language"
-                className={inputClassName}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="create-notes" className="text-sm font-medium">
-                Notes
-              </label>
-              <textarea
-                id="create-notes"
-                name="notes"
-                rows={3}
-                className={inputClassName}
-              />
-            </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-            >
-              Add item
-            </button>
-          </form>
+          <AddCollectionItemForm action={createCollectionItem} />
         </section>
 
         <section className="space-y-4">
@@ -220,6 +127,21 @@ export default async function MyCollectionPage({
                         {item.language ? (
                           <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
                             {item.language}
+                          </span>
+                        ) : null}
+                        {item.tcg_api_card_id ? (
+                          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                            Official card
+                          </span>
+                        ) : null}
+                        {item.card_number ? (
+                          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                            #{item.card_number}
+                          </span>
+                        ) : null}
+                        {item.set_id ? (
+                          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                            {item.set_id}
                           </span>
                         ) : null}
                         <p className="text-xs text-zinc-500 dark:text-zinc-500">

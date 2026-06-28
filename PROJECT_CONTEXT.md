@@ -79,7 +79,9 @@ Web app for Pokémon collectors to browse in-person trading events and post list
 - My Collection page (`/my-collection`) — CRUD for personal `collection_items`
 - Create listing from collection on `/events/[id]/new-listing` — picker prefills form; snapshot + optional `collection_item_id`
 - Optional card/sealed **language** (dropdown) on collection items and listings; snapshotted on listing create
-- Pokémon TCG API **Phase A**: migration + `lib/pokemon-tcg.ts` + authenticated `GET /api/card-search` (no UI yet)
+- Pokémon TCG API **Phase A**: migration + `lib/pokemon-tcg.ts` + authenticated `GET /api/card-search`
+- Pokémon TCG API **Phase B**: My Collection add form — `CardSearchCombobox` with search/manual toggle for cards
+- Pokémon TCG API **Phase C**: search selection saves `tcg_api_card_id`, `card_number`, `set_id` + prefilled name/set on create
 
 ## Existing routes
 
@@ -96,7 +98,7 @@ Web app for Pokémon collectors to browse in-person trading events and post list
 
 ## Remaining roadmap
 
-1. **Pokémon TCG API Phase B–D** — My Collection autocomplete, form prefill, listing propagation
+1. **Pokémon TCG API Phase D** — propagate collection API fields to listings
 2. **Join event** — use `join_code` to associate users with events
 3. **Interest messages** — optional `message` field (not in MVP)
 
