@@ -20,6 +20,12 @@ export async function Navbar() {
           {user ? (
             <>
               <Link
+                href="/my-collection"
+                className="text-zinc-600 transition-colors hover:text-foreground dark:text-zinc-400"
+              >
+                My Collection
+              </Link>
+              <Link
                 href="/my-listings"
                 className="text-zinc-600 transition-colors hover:text-foreground dark:text-zinc-400"
               >

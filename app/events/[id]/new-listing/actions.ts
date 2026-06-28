@@ -13,6 +13,32 @@ function isListingType(value: string): value is ListingType {
   return LISTING_TYPES.includes(value as ListingType);
 }
 
+function getOptionalText(formData: FormData, name: string) {
+  const value = formData.get(name);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+async function getValidatedCollectionItemId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  collectionItemId: FormDataEntryValue | null,
+) {
+  if (typeof collectionItemId !== "string" || !collectionItemId.trim()) {
+    return null;
+  }
+
+  const { data: item } = await supabase
+    .from("collection_items")
+    .select("id")
+    .eq("id", collectionItemId.trim())
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  return item?.id ?? null;
+}
+
 export async function createListing(eventId: string, formData: FormData) {
   const supabase = await createClient();
   const {
@@ -40,11 +66,17 @@ export async function createListing(eventId: string, formData: FormData) {
 
   const normalizedCardName = cardName.trim();
   const cardRef = normalizedCardName.toLowerCase();
+  const collectionItemId = await getValidatedCollectionItemId(
+    supabase,
+    user.id,
+    formData.get("collection_item_id"),
+  );
 
-  const tradeFor = formData.get("trade_for");
-  const condition = formData.get("condition");
-  const setName = formData.get("set_name");
-  const notes = formData.get("notes");
+  const tradeFor = getOptionalText(formData, "trade_for");
+  const targetPrice = getOptionalText(formData, "target_price");
+  const condition = getOptionalText(formData, "condition");
+  const setName = getOptionalText(formData, "set_name");
+  const notes = getOptionalText(formData, "notes");
 
   const { error } = await supabase.from("listings").insert({
     event_id: eventId,
@@ -53,16 +85,12 @@ export async function createListing(eventId: string, formData: FormData) {
     card_name: normalizedCardName,
     card_ref: cardRef,
     status: "active",
-    ...(typeof tradeFor === "string" && tradeFor.trim()
-      ? { trade_for: tradeFor.trim() }
-      : {}),
-    ...(typeof condition === "string" && condition.trim()
-      ? { condition: condition.trim() }
-      : {}),
-    ...(typeof setName === "string" && setName.trim()
-      ? { set_name: setName.trim() }
-      : {}),
-    ...(typeof notes === "string" && notes.trim() ? { notes: notes.trim() } : {}),
+    ...(collectionItemId ? { collection_item_id: collectionItemId } : {}),
+    ...(tradeFor ? { trade_for: tradeFor } : {}),
+    ...(targetPrice ? { target_price: targetPrice } : {}),
+    ...(condition ? { condition } : {}),
+    ...(setName ? { set_name: setName } : {}),
+    ...(notes ? { notes } : {}),
   });
 
   if (error) {
