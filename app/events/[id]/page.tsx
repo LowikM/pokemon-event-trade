@@ -94,6 +94,10 @@ export default async function EventDetailPage({
     typeof resolvedSearchParams.error === "string"
       ? resolvedSearchParams.error
       : undefined;
+  const wishlistActivated =
+    typeof resolvedSearchParams.wishlistActivated === "string"
+      ? resolvedSearchParams.wishlistActivated
+      : undefined;
   const messageSent = resolvedSearchParams.messageSent === "1";
   const filters = parseListingFilters(resolvedSearchParams);
   const supabase = await createClient();
@@ -215,12 +219,20 @@ export default async function EventDetailPage({
             </div>
           </dl>
 
-          <Link
-            href={`/events/${event.id}/new-listing`}
-            className="inline-flex rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-          >
-            Create Listing
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/events/${event.id}/new-listing`}
+              className="inline-flex rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+            >
+              Create Listing
+            </Link>
+            <Link
+              href={`/events/${event.id}/activate-wishlist`}
+              className="inline-flex rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              Activate Wishlist
+            </Link>
+          </div>
         </div>
 
         <section className="space-y-4">
@@ -229,6 +241,16 @@ export default async function EventDetailPage({
           <EventListingFilters eventId={event.id} filters={filters} />
 
           <MessageStatusAlert messageSent={messageSent} />
+
+          {wishlistActivated ? (
+            <p
+              className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-300"
+              role="status"
+            >
+              Activated {wishlistActivated} wishlist item
+              {wishlistActivated === "1" ? "" : "s"} as want listings.
+            </p>
+          ) : null}
 
           {pageError ? (
             <p

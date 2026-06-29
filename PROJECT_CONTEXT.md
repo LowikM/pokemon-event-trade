@@ -45,6 +45,7 @@ Web app for Pokémon collectors to browse in-person trading events and post list
 | `condition`, `set_name`, `notes`, `target_price`, `language` | text (optional) |
 | `tcg_api_card_id`, `card_number`, `set_id` | text (optional; Pokémon TCG API metadata, snapshotted) |
 | `collection_item_id` | uuid → `collection_items.id` (optional) |
+| `wishlist_item_id` | uuid → `wishlist_items.id` (optional; want listings from wishlist activation) |
 | `created_at`, `updated_at` | timestamptz |
 
 ### `public.wishlist_items`
@@ -122,6 +123,7 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 - **Message replies + unread:** `replyToMessage`, `markMessageRead`; `read_at` + `parent_message_id`; unread badge in navbar
 - **User profiles (MVP):** optional `bio`, `location`, `favorite_pokemon`, `avatar_url` on `users`; protected `/profile` edit form; public `/users/[id]` profile pages; profile links from listings, matches, interests, and messages
 - **My Wishlist (Phase 1):** `wishlist_items` table; protected `/my-wishlist` CRUD; TCG search + manual entry; priority 1–5; not yet linked to events or want listings
+- **Activate wishlist for event (Phase 2):** `listings.wishlist_item_id`; protected `/events/[id]/activate-wishlist`; `activateWishlistForEvent` creates snapshotted `want` listings; partial unique index prevents duplicate active wants per event
 
 ## Existing routes
 
@@ -140,6 +142,7 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 | `/events` | Public | Event list |
 | `/events/[id]` | Public | Event detail |
 | `/events/[id]/new-listing` | Protected | Create listing form with collection picker |
+| `/events/[id]/activate-wishlist` | Protected | Activate wishlist items as want listings for event |
 
 ## Remaining roadmap
 
