@@ -21,23 +21,30 @@ function getOptionalText(formData: FormData, name: string) {
   return trimmed ? trimmed : null;
 }
 
-async function getValidatedCollectionItemId(
+type CollectionItemSnapshot = {
+  id: string;
+  tcg_api_card_id: string | null;
+  card_number: string | null;
+  set_id: string | null;
+};
+
+async function getValidatedCollectionItem(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   collectionItemId: FormDataEntryValue | null,
-) {
+): Promise<CollectionItemSnapshot | null> {
   if (typeof collectionItemId !== "string" || !collectionItemId.trim()) {
     return null;
   }
 
   const { data: item } = await supabase
     .from("collection_items")
-    .select("id")
+    .select("id, tcg_api_card_id, card_number, set_id")
     .eq("id", collectionItemId.trim())
     .eq("user_id", userId)
     .maybeSingle();
 
-  return item?.id ?? null;
+  return item ?? null;
 }
 
 export async function createListing(eventId: string, formData: FormData) {
@@ -67,7 +74,7 @@ export async function createListing(eventId: string, formData: FormData) {
 
   const normalizedCardName = cardName.trim();
   const cardRef = normalizedCardName.toLowerCase();
-  const collectionItemId = await getValidatedCollectionItemId(
+  const collectionItem = await getValidatedCollectionItem(
     supabase,
     user.id,
     formData.get("collection_item_id"),
@@ -93,7 +100,14 @@ export async function createListing(eventId: string, formData: FormData) {
     card_name: normalizedCardName,
     card_ref: cardRef,
     status: "active",
-    ...(collectionItemId ? { collection_item_id: collectionItemId } : {}),
+    ...(collectionItem ? { collection_item_id: collectionItem.id } : {}),
+    ...(collectionItem?.tcg_api_card_id
+      ? { tcg_api_card_id: collectionItem.tcg_api_card_id }
+      : {}),
+    ...(collectionItem?.card_number
+      ? { card_number: collectionItem.card_number }
+      : {}),
+    ...(collectionItem?.set_id ? { set_id: collectionItem.set_id } : {}),
     ...(tradeFor ? { trade_for: tradeFor } : {}),
     ...(targetPrice ? { target_price: targetPrice } : {}),
     ...(condition ? { condition } : {}),

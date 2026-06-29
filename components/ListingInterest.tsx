@@ -1,9 +1,12 @@
 import Link from "next/link";
 
-import { expressInterest } from "@/app/events/[id]/actions";
+import {
+  addInterest,
+  removeInterest,
+} from "@/app/listing-interests/actions";
+import { formatInterestCount } from "@/lib/listing-interests";
 
 type ListingInterestProps = {
-  eventId: string;
   listingId: string;
   listingOwnerId: string;
   currentUserId: string | null;
@@ -11,8 +14,10 @@ type ListingInterestProps = {
   interestCount: number;
 };
 
+const buttonClassName =
+  "rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
+
 export function ListingInterest({
-  eventId,
   listingId,
   listingOwnerId,
   currentUserId,
@@ -20,12 +25,12 @@ export function ListingInterest({
   interestCount,
 }: ListingInterestProps) {
   const isOwner = currentUserId === listingOwnerId;
-  const interestLabel =
-    interestCount === 1 ? "1 interested" : `${interestCount} interested`;
 
   if (isOwner) {
     return interestCount > 0 ? (
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">{interestLabel}</p>
+      <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+        {formatInterestCount(interestCount)}
+      </p>
     ) : null;
   }
 
@@ -33,29 +38,25 @@ export function ListingInterest({
     <div className="mt-4 flex flex-wrap items-center gap-3">
       {interestCount > 0 ? (
         <span className="text-sm text-zinc-600 dark:text-zinc-400">
-          {interestLabel}
+          {formatInterestCount(interestCount)}
         </span>
       ) : null}
 
       {isInterested ? (
-        <span className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
-          Interested
-        </span>
+        <form action={removeInterest.bind(null, listingId)}>
+          <button type="submit" className={buttonClassName}>
+            ✓ Interested
+          </button>
+        </form>
       ) : currentUserId ? (
-        <form action={expressInterest.bind(null, eventId, listingId)}>
-          <button
-            type="submit"
-            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-          >
-            I&apos;m interested
+        <form action={addInterest.bind(null, listingId)}>
+          <button type="submit" className={buttonClassName}>
+            ❤️ I&apos;m interested
           </button>
         </form>
       ) : (
-        <Link
-          href="/login"
-          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-        >
-          I&apos;m interested
+        <Link href="/login" className={buttonClassName}>
+          ❤️ I&apos;m interested
         </Link>
       )}
     </div>

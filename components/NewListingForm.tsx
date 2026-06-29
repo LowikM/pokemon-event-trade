@@ -12,6 +12,8 @@ type CollectionItem = {
   condition: string | null;
   notes: string | null;
   language: string | null;
+  tcg_api_card_id: string | null;
+  card_number: string | null;
 };
 
 type NewListingFormProps = {
@@ -125,6 +127,16 @@ export function NewListingForm({
                           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                             {ITEM_KIND_LABELS[item.item_kind]}
                           </span>
+                          {item.tcg_api_card_id ? (
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                              Official card
+                            </span>
+                          ) : null}
+                          {item.card_number ? (
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                              #{item.card_number}
+                            </span>
+                          ) : null}
                           <span className="text-sm font-medium">
                             {item.card_name}
                           </span>

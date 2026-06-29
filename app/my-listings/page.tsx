@@ -2,6 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { updateListingStatus } from "@/app/my-listings/actions";
+import {
+  ListingCardThumbnail,
+  ListingOfficialCardBadges,
+} from "@/components/ListingOfficialCard";
+import { formatInterestCount } from "@/lib/listing-interests";
+import { getCardImagesByIds } from "@/lib/pokemon-tcg";
 import { createClient } from "@/lib/supabase/server";
 
 type ListingType = "want" | "trade" | "sale";
@@ -20,10 +26,14 @@ type ListingRow = {
   card_name: string;
   type: ListingType;
   status: ListingStatus;
+  set_name: string | null;
   language: string | null;
+  tcg_api_card_id: string | null;
+  card_number: string | null;
+  set_id: string | null;
   created_at: string;
   events: EmbeddedEvent | EmbeddedEvent[] | null;
-  interests: EmbeddedInterest[] | null;
+  listing_interests: EmbeddedInterest[] | null;
 };
 
 const TYPE_LABELS: Record<ListingType, string> = {
@@ -84,10 +94,14 @@ export default async function MyListingsPage({
       card_name,
       type,
       status,
+      set_name,
       language,
+      tcg_api_card_id,
+      card_number,
+      set_id,
       created_at,
       events(name),
-      interests(
+      listing_interests(
         id,
         created_at,
         users(display_name, email)
@@ -98,6 +112,11 @@ export default async function MyListingsPage({
     .order("created_at", { ascending: false });
 
   const listings = (data ?? []) as ListingRow[];
+  const cardImagesById = await getCardImagesByIds(
+    listings
+      .map((listing) => listing.tcg_api_card_id)
+      .filter((id): id is string => Boolean(id)),
+  );
 
   return (
     <div className="flex flex-1 justify-center px-4 py-12">
@@ -136,24 +155,36 @@ export default async function MyListingsPage({
         ) : (
           <ul className="grid gap-4">
             {listings.map((listing) => {
-              const interests = listing.interests ?? [];
+              const interests = listing.listing_interests ?? [];
               const interestCount = interests.length;
               const updateStatus = updateListingStatus.bind(null, listing.id);
+              const imageUrl = listing.tcg_api_card_id
+                ? (cardImagesById.get(listing.tcg_api_card_id)?.small ?? null)
+                : null;
 
               return (
                 <li key={listing.id}>
                   <article className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-start gap-2">
-                        <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-                          {TYPE_LABELS[listing.type]}
-                        </span>
-                        <h2 className="text-base font-semibold tracking-tight">
-                          {listing.card_name}
-                        </h2>
-                      </div>
+                    <div className="flex gap-3">
+                      <ListingCardThumbnail
+                        imageUrl={imageUrl}
+                        cardName={listing.card_name}
+                      />
+                      <div className="min-w-0 flex-1 space-y-3">
+                        <div className="flex flex-wrap items-start gap-2">
+                          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                            {TYPE_LABELS[listing.type]}
+                          </span>
+                          <ListingOfficialCardBadges
+                            tcgApiCardId={listing.tcg_api_card_id}
+                            cardNumber={listing.card_number}
+                          />
+                          <h2 className="text-base font-semibold tracking-tight">
+                            {listing.card_name}
+                          </h2>
+                        </div>
 
-                      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                        <dl className="grid gap-2 text-sm sm:grid-cols-2">
                         <div className="sm:col-span-2">
                           <dt className="font-medium text-zinc-500 dark:text-zinc-400">
                             Status
@@ -193,6 +224,14 @@ export default async function MyListingsPage({
                             {getEventName(listing.events) ?? "Unknown event"}
                           </dd>
                         </div>
+                        {listing.set_name ? (
+                          <div>
+                            <dt className="font-medium text-zinc-500 dark:text-zinc-400">
+                              Set
+                            </dt>
+                            <dd className="mt-0.5">{listing.set_name}</dd>
+                          </div>
+                        ) : null}
                         <div>
                           <dt className="font-medium text-zinc-500 dark:text-zinc-400">
                             Created
@@ -214,12 +253,11 @@ export default async function MyListingsPage({
                             Interests
                           </dt>
                           <dd className="mt-0.5">
-                            {interestCount === 1
-                              ? "1 interested"
-                              : `${interestCount} interested`}
+                            {formatInterestCount(interestCount)}
                           </dd>
                         </div>
                       </dl>
+                    </div>
                     </div>
 
                     <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">

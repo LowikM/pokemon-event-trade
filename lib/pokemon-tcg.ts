@@ -493,3 +493,34 @@ export async function getCardImagesById(tcgApiCardId: string) {
     large: card.images.large ?? card.images.small,
   };
 }
+
+export async function getCardImagesByIds(
+  tcgApiCardIds: Iterable<string>,
+): Promise<Map<string, { small: string; large: string }>> {
+  const uniqueIds = [
+    ...new Set(
+      [...tcgApiCardIds]
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  ];
+  const results = new Map<string, { small: string; large: string }>();
+
+  await Promise.all(
+    uniqueIds.map(async (id) => {
+      try {
+        const images = await getCardImagesById(id);
+        if (images) {
+          results.set(id, images);
+        }
+      } catch (error) {
+        console.error("[pokemon-tcg] failed to load card image", {
+          tcgApiCardId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }),
+  );
+
+  return results;
+}

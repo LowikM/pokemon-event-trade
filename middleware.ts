@@ -37,6 +37,8 @@ export async function middleware(request: NextRequest) {
     !user &&
     (request.nextUrl.pathname.startsWith("/profile") ||
       request.nextUrl.pathname.startsWith("/my-listings") ||
+      request.nextUrl.pathname.startsWith("/my-interests") ||
+      request.nextUrl.pathname.startsWith("/my-matches") ||
       request.nextUrl.pathname.startsWith("/my-collection"))
   ) {
     const url = request.nextUrl.clone();

@@ -1,12 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { EventListingFilters } from "@/components/EventListingFilters";
 import { ListingInterest } from "@/components/ListingInterest";
+import {
+  ListingCardThumbnail,
+  ListingOfficialCardBadges,
+} from "@/components/ListingOfficialCard";
+import {
+  escapeIlikePattern,
+  hasActiveListingFilters,
+  LISTING_SORT_OPTIONS,
+  parseListingFilters,
+} from "@/lib/listing-filters";
+import { getCardImagesByIds } from "@/lib/pokemon-tcg";
 import { createClient } from "@/lib/supabase/server";
 
 type EventDetailPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 type Listing = {
@@ -21,6 +33,9 @@ type Listing = {
   set_name: string | null;
   notes: string | null;
   language: string | null;
+  tcg_api_card_id: string | null;
+  card_number: string | null;
+  set_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -40,12 +55,29 @@ function formatEventDate(date: string) {
   });
 }
 
+function buildListingSearchOrFilter(query: string) {
+  const pattern = `%${escapeIlikePattern(query)}%`;
+  const quotedPattern = `"${pattern.replace(/"/g, '""')}"`;
+
+  return [
+    `card_name.ilike.${quotedPattern}`,
+    `set_name.ilike.${quotedPattern}`,
+    `card_number.ilike.${quotedPattern}`,
+    `language.ilike.${quotedPattern}`,
+  ].join(",");
+}
+
 export default async function EventDetailPage({
   params,
   searchParams,
 }: EventDetailPageProps) {
   const { id } = await params;
-  const { error: pageError } = await searchParams;
+  const resolvedSearchParams = await searchParams;
+  const pageError =
+    typeof resolvedSearchParams.error === "string"
+      ? resolvedSearchParams.error
+      : undefined;
+  const filters = parseListingFilters(resolvedSearchParams);
   const supabase = await createClient();
 
   const {
@@ -64,16 +96,47 @@ export default async function EventDetailPage({
     notFound();
   }
 
-  const { data: listings, error: listingsError } = await supabase
+  let listingsQuery = supabase
     .from("listings")
     .select(
-      "id, event_id, user_id, type, card_name, trade_for, status, condition, set_name, notes, language, created_at, updated_at",
+      "id, event_id, user_id, type, card_name, trade_for, status, condition, set_name, notes, language, tcg_api_card_id, card_number, set_id, created_at, updated_at",
     )
     .eq("event_id", id)
-    .eq("status", "active")
-    .order("created_at", { ascending: false });
+    .eq("status", "active");
+
+  if (filters.type) {
+    listingsQuery = listingsQuery.eq("type", filters.type);
+  }
+
+  if (filters.language) {
+    listingsQuery = listingsQuery.eq("language", filters.language);
+  }
+
+  if (filters.condition) {
+    listingsQuery = listingsQuery.eq("condition", filters.condition);
+  }
+
+  if (filters.official) {
+    listingsQuery = listingsQuery.not("tcg_api_card_id", "is", null);
+  }
+
+  if (filters.q) {
+    listingsQuery = listingsQuery.or(buildListingSearchOrFilter(filters.q));
+  }
+
+  const sort = LISTING_SORT_OPTIONS[filters.sort];
+  listingsQuery = listingsQuery.order(sort.column, {
+    ascending: sort.ascending,
+  });
+
+  const { data: listings, error: listingsError } = await listingsQuery;
 
   const activeListings = (listings ?? []) as Listing[];
+  const cardImagesById = await getCardImagesByIds(
+    activeListings
+      .map((listing) => listing.tcg_api_card_id)
+      .filter((listingId): listingId is string => Boolean(listingId)),
+  );
   const listingIds = activeListings.map((listing) => listing.id);
 
   const interestCountByListing = new Map<string, number>();
@@ -81,7 +144,7 @@ export default async function EventDetailPage({
 
   if (listingIds.length > 0) {
     const { data: interests } = await supabase
-      .from("interests")
+      .from("listing_interests")
       .select("listing_id, user_id")
       .in("listing_id", listingIds);
 
@@ -96,6 +159,8 @@ export default async function EventDetailPage({
       }
     }
   }
+
+  const filtersActive = hasActiveListingFilters(filters);
 
   return (
     <div className="flex flex-1 justify-center px-4 py-12">
@@ -143,6 +208,8 @@ export default async function EventDetailPage({
         <section className="space-y-4">
           <h2 className="text-lg font-semibold tracking-tight">Listings</h2>
 
+          <EventListingFilters eventId={event.id} filters={filters} />
+
           {pageError ? (
             <p
               className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
@@ -161,76 +228,97 @@ export default async function EventDetailPage({
             </p>
           ) : activeListings.length === 0 ? (
             <p className="rounded-xl border border-dashed border-zinc-300 px-6 py-12 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
-              No listings yet.
+              {filtersActive
+                ? "No listings match your filters."
+                : "No listings yet."}
             </p>
           ) : (
             <ul className="grid gap-4">
-              {activeListings.map((listing) => (
-                <li key={listing.id}>
-                  <article className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-                    <div className="flex flex-wrap items-start gap-2">
-                      <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-                        {TYPE_LABELS[listing.type]}
-                      </span>
-                      <h3 className="text-base font-semibold tracking-tight">
-                        {listing.card_name}
-                      </h3>
-                    </div>
+              {activeListings.map((listing) => {
+                const imageUrl = listing.tcg_api_card_id
+                  ? (cardImagesById.get(listing.tcg_api_card_id)?.small ?? null)
+                  : null;
 
-                    <dl className="mt-3 space-y-2 text-sm">
-                      {listing.set_name ? (
-                        <div>
-                          <dt className="font-medium text-zinc-500 dark:text-zinc-400">
-                            Set
-                          </dt>
-                          <dd>{listing.set_name}</dd>
-                        </div>
-                      ) : null}
-                      {listing.condition ? (
-                        <div>
-                          <dt className="font-medium text-zinc-500 dark:text-zinc-400">
-                            Condition
-                          </dt>
-                          <dd>{listing.condition}</dd>
-                        </div>
-                      ) : null}
-                      {listing.language ? (
-                        <div>
-                          <dt className="font-medium text-zinc-500 dark:text-zinc-400">
-                            Language
-                          </dt>
-                          <dd>{listing.language}</dd>
-                        </div>
-                      ) : null}
-                      {listing.trade_for ? (
-                        <div>
-                          <dt className="font-medium text-zinc-500 dark:text-zinc-400">
-                            Trade for
-                          </dt>
-                          <dd>{listing.trade_for}</dd>
-                        </div>
-                      ) : null}
-                      {listing.notes ? (
-                        <div>
-                          <dt className="font-medium text-zinc-500 dark:text-zinc-400">
-                            Notes
-                          </dt>
-                          <dd className="leading-6">{listing.notes}</dd>
-                        </div>
-                      ) : null}
-                    </dl>
+                return (
+                  <li key={listing.id}>
+                    <article className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+                      <div className="flex gap-3">
+                        <ListingCardThumbnail
+                          imageUrl={imageUrl}
+                          cardName={listing.card_name}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start gap-2">
+                            <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                              {TYPE_LABELS[listing.type]}
+                            </span>
+                            <ListingOfficialCardBadges
+                              tcgApiCardId={listing.tcg_api_card_id}
+                              cardNumber={listing.card_number}
+                            />
+                            <h3 className="text-base font-semibold tracking-tight">
+                              {listing.card_name}
+                            </h3>
+                          </div>
 
-                    <ListingInterest
-                      eventId={event.id}
-                      listingId={listing.id}
-                      listingOwnerId={listing.user_id}
-                      currentUserId={user?.id ?? null}
-                      isInterested={interestedListingIds.has(listing.id)}
-                      interestCount={interestCountByListing.get(listing.id) ?? 0}
-                    />
-                  </article>
-                </li>
-              ))}
+                          <dl className="mt-3 space-y-2 text-sm">
+                            {listing.set_name ? (
+                              <div>
+                                <dt className="font-medium text-zinc-500 dark:text-zinc-400">
+                                  Set
+                                </dt>
+                                <dd>{listing.set_name}</dd>
+                              </div>
+                            ) : null}
+                            {listing.condition ? (
+                              <div>
+                                <dt className="font-medium text-zinc-500 dark:text-zinc-400">
+                                  Condition
+                                </dt>
+                                <dd>{listing.condition}</dd>
+                              </div>
+                            ) : null}
+                            {listing.language ? (
+                              <div>
+                                <dt className="font-medium text-zinc-500 dark:text-zinc-400">
+                                  Language
+                                </dt>
+                                <dd>{listing.language}</dd>
+                              </div>
+                            ) : null}
+                            {listing.trade_for ? (
+                              <div>
+                                <dt className="font-medium text-zinc-500 dark:text-zinc-400">
+                                  Trade for
+                                </dt>
+                                <dd>{listing.trade_for}</dd>
+                              </div>
+                            ) : null}
+                            {listing.notes ? (
+                              <div>
+                                <dt className="font-medium text-zinc-500 dark:text-zinc-400">
+                                  Notes
+                                </dt>
+                                <dd className="leading-6">{listing.notes}</dd>
+                              </div>
+                            ) : null}
+                          </dl>
+
+                          <ListingInterest
+                            listingId={listing.id}
+                            listingOwnerId={listing.user_id}
+                            currentUserId={user?.id ?? null}
+                            isInterested={interestedListingIds.has(listing.id)}
+                            interestCount={
+                              interestCountByListing.get(listing.id) ?? 0
+                            }
+                          />
+                        </div>
+                      </div>
+                    </article>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

@@ -39,7 +39,9 @@ export default async function NewListingPage({
 
   const { data: collectionItems } = await supabase
     .from("collection_items")
-    .select("id, item_kind, card_name, set_name, condition, notes, language")
+    .select(
+      "id, item_kind, card_name, set_name, condition, notes, language, tcg_api_card_id, card_number",
+    )
     .eq("user_id", user.id)
     .order("card_name", { ascending: true });
 
