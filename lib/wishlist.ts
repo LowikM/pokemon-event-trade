@@ -14,6 +14,47 @@ export const WISHLIST_PRIORITY_LABELS: Record<number, string> = {
 
 export const WISHLIST_PRIORITY_OPTIONS = [1, 2, 3, 4, 5] as const;
 
+export const WISHLIST_DUPLICATE_ERROR =
+  "This card is already in your wishlist.";
+
+export type WishlistFieldData = {
+  card_name: string;
+  card_ref: string;
+  set_name: string | null;
+  notes: string | null;
+  language: string | null;
+  priority: number;
+  tcg_api_card_id: string | null;
+  card_number: string | null;
+  set_id: string | null;
+};
+
+export function isWishlistUniqueViolation(error: { code?: string } | null) {
+  return error?.code === "23505";
+}
+
+export function parseWishlistItemIds(formData: FormData) {
+  return [
+    ...new Set(
+      formData
+        .getAll("wishlist_item_ids")
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+export function parseWishlistItemId(formData: FormData) {
+  const value = formData.get("wishlist_item_id");
+
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  return value.trim();
+}
+
 function getOptionalText(formData: FormData, name: string) {
   const value = formData.get(name);
   if (typeof value !== "string") {

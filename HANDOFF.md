@@ -17,6 +17,7 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - **My Collection:** protected `/my-collection` — CRUD for `collection_items`
 - **My Wishlist (Phase 1):** protected `/my-wishlist` — CRUD for `wishlist_items`; TCG search/manual add; priority 1–5
 - **Activate wishlist (Phase 2):** protected `/events/[id]/activate-wishlist`; `activateWishlistForEvent` in `app/events/[id]/activate-wishlist/actions.ts`; checklist UI; snapshotted want listings with `wishlist_item_id`
+- **My Wishlist UX:** unique constraints on `wishlist_items`; duplicate error on create; bulk delete/set priority on `/my-wishlist`; activate page filters + select all/none + selected count
 - **Listing from collection:** searchable picker prefills form; snapshot on insert + optional `collection_item_id`
 - **Language:** optional dropdown on collection + listings (13 values); snapshotted when creating listings
 - **Pokémon TCG API (Phase A):** `lib/pokemon-tcg.ts`, `GET /api/card-search?q=...` (auth required); optional `POKEMON_TCG_API_KEY`; DB columns `tcg_api_card_id`, `card_number`, `set_id`; no images stored in DB
@@ -25,7 +26,7 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - **Pokémon TCG API (Phase D):** collection API fields snapshotted on listing create; thumbnails + badges on event + My Listings pages via `getCardImagesByIds`
 - **Event listing search & filters:** `/events/[id]` GET form → URL params; Supabase query filtering in `lib/listing-filters.ts` + `EventListingFilters`
 - **Matching engine (V2):** `/my-matches` — `findUserTradeMatches()` in `lib/listing-matches.ts`; grouped by event + user; perfect/strong/direct/reverse categories; no DB table
-- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`, `CardSearchCombobox`, `AddCollectionItemForm`, `AddWishlistItemForm`, `PrioritySelect`, `ActivateWishlistForm`, `EventListingFilters`, `ListingOfficialCard`, `UserTradeMatchCard`, `SendMessageForm`, `ReplyMessageForm`, `MessageStatusAlert`, `ProfileForm`, `UserProfileLink`
+- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`, `CardSearchCombobox`, `AddCollectionItemForm`, `AddWishlistItemForm`, `PrioritySelect`, `ActivateWishlistForm`, `WishlistManageList`, `EventListingFilters`, `ListingOfficialCard`, `UserTradeMatchCard`, `SendMessageForm`, `ReplyMessageForm`, `MessageStatusAlert`, `ProfileForm`, `UserProfileLink`
 - **Stack:** Next.js 16 App Router, React 19, Tailwind v4, Supabase SSR
 
 ## Build next (priority order)
@@ -39,7 +40,7 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 
 **`listings`:** `id`, `event_id`, `user_id`, `type` (`want`|`trade`|`sale`), `card_name`, `card_ref` (required), `trade_for`, `target_price`, `status` (`active`|`reserved`|`completed`|`removed`), `condition`, `set_name`, `notes`, `language`, `tcg_api_card_id`, `card_number`, `set_id`, `collection_item_id` (optional), `wishlist_item_id` (optional), `created_at`, `updated_at`
 
-**`wishlist_items`:** `id`, `user_id`, `card_name`, `card_ref`, `set_name`, `language`, `notes`, `tcg_api_card_id`, `card_number`, `set_id`, `priority` (1–5, default 3), `created_at`, `updated_at`
+**`wishlist_items`:** `id`, `user_id`, `card_name`, `card_ref`, `set_name`, `language`, `notes`, `tcg_api_card_id`, `card_number`, `set_id`, `priority` (1–5, default 3), `created_at`, `updated_at` — unique `(user_id, tcg_api_card_id)` when official; unique `(user_id, card_ref)` when manual
 
 **`collection_items`:** `id`, `user_id`, `item_kind` (`card`|`sealed`), `card_name`, `card_ref`, `set_name`, `condition`, `notes`, `language`, `tcg_api_card_id`, `card_number`, `set_id`, `quantity`, `created_at`, `updated_at`
 
@@ -77,7 +78,20 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 | User profiles (MVP) | Done |
 | My Wishlist (Phase 1) | Done |
 | Activate wishlist (Phase 2) | Done |
+| My Wishlist UX | Done |
 | Join event | Not started |
+
+## Future: Bulk add cards by set/range
+
+**Not implemented yet** — needs set search and card-range selection design first.
+
+Planned flow example:
+
+1. Search a Pokémon TCG set (e.g. Brilliant Stars).
+2. Select a card number range (e.g. 1–32) or individual numbers.
+3. Add matching cards to **My Wishlist** or **My Collection** in one action.
+
+Blockers: set catalog API/query UX, range picker UI, dedupe against existing rows, and batch insert limits. Do not build until those are designed.
 
 ## Tips for the next chat
 
@@ -88,7 +102,7 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - Listing interests: `addInterest(listingId)` / `removeInterest(listingId)` in `app/listing-interests/actions.ts`; table `listing_interests`.
 - Messages: `sendMessage`, `replyToMessage`, `markMessageRead` in `app/messages/actions.ts`; max body 1000 chars; inbox at `/messages`; unread = `read_at IS NULL`
 - Profiles: `updateProfile(formData)` in `app/profile/actions.ts`; max lengths display_name 80, bio 500, location 120, favorite_pokemon 80, avatar_url 500; public profile at `/users/[id]`
-- Wishlist: `createWishlistItem`, `updateWishlistItem`, `deleteWishlistItem` in `app/my-wishlist/actions.ts`; parsing in `lib/wishlist.ts`; priority 1–5; `card_ref = card_name.trim().toLowerCase()`
+- Wishlist: `createWishlistItem`, `updateWishlistItem`, `deleteWishlistItem`, `bulkDeleteWishlistItems`, `bulkSetWishlistPriority` in `app/my-wishlist/actions.ts`; parsing in `lib/wishlist.ts`; duplicate message: "This card is already in your wishlist."
 - Activate wishlist: `activateWishlistForEvent(eventId, wishlistItemIds[])` in `app/events/[id]/activate-wishlist/actions.ts`; page `/events/[id]/activate-wishlist`; partial unique index on active want + `wishlist_item_id` per event
 - Event listing filters: `/events/[id]?q=charizard&type=sale&language=English&condition=Near+Mint&official=1&sort=name` — parsed in `lib/listing-filters.ts`, applied in Supabase query on event page.
 - Matches: `/my-matches` — `findUserTradeMatches()` in `lib/listing-matches.ts`; groups by event + other user; dedupes cards; categories perfect/strong/direct/reverse; absolute counts only.
@@ -102,5 +116,6 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
   - `supabase/migrations/20260628170000_add_user_profile_fields.sql`
   - `supabase/migrations/20260628180000_create_wishlist_items.sql`
   - `supabase/migrations/20260628190000_add_wishlist_item_id_to_listings.sql`
+  - `supabase/migrations/20260628200000_wishlist_unique_constraints.sql`
 - Language values live in `lib/languages.ts` (dropdown only; DB stores plain text).
 - After changes: `npm run build`.

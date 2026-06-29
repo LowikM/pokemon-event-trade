@@ -57,6 +57,7 @@ Web app for Pokémon collectors to browse in-person trading events and post list
 | `set_name`, `language`, `notes` | text (optional) |
 | `tcg_api_card_id`, `card_number`, `set_id` | text (optional; Pokémon TCG API metadata) |
 | `priority` | integer (1–5, default 3) |
+| Unique per user | `(user_id, tcg_api_card_id)` when official; `(user_id, card_ref)` when manual |
 | `created_at`, `updated_at` | timestamptz |
 
 ### `public.collection_items`
@@ -122,8 +123,9 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 - **Contact flow (MVP):** `messages` table; `sendMessage` server action; inline contact forms on matches/listings/interests; protected `/messages` inbox
 - **Message replies + unread:** `replyToMessage`, `markMessageRead`; `read_at` + `parent_message_id`; unread badge in navbar
 - **User profiles (MVP):** optional `bio`, `location`, `favorite_pokemon`, `avatar_url` on `users`; protected `/profile` edit form; public `/users/[id]` profile pages; profile links from listings, matches, interests, and messages
-- **My Wishlist (Phase 1):** `wishlist_items` table; protected `/my-wishlist` CRUD; TCG search + manual entry; priority 1–5; not yet linked to events or want listings
+- **My Wishlist (Phase 1):** `wishlist_items` table; protected `/my-wishlist` CRUD; TCG search + manual entry; priority 1–5
 - **Activate wishlist for event (Phase 2):** `listings.wishlist_item_id`; protected `/events/[id]/activate-wishlist`; `activateWishlistForEvent` creates snapshotted `want` listings; partial unique index prevents duplicate active wants per event
+- **My Wishlist UX:** duplicate prevention (unique per user + official/manual card); bulk manage on `/my-wishlist`; bulk activation filters on activate page (priority, language, select all/none, selected count)
 
 ## Existing routes
 
