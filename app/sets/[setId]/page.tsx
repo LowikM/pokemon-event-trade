@@ -2,12 +2,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { SetBrowserGrid } from "@/components/SetBrowserGrid";
+import { SetCompletionStatsPanel } from "@/components/SetCompletionStatsPanel";
+import { recordRecentSetVisit } from "@/lib/dashboard";
 import {
   formatSetReleaseDate,
   getCardsForSet,
   getSet,
   PokemonTcgApiError,
 } from "@/lib/pokemon-tcg";
+import { computeSetCompletionStats } from "@/lib/set-browser";
 import { createClient } from "@/lib/supabase/server";
 
 type SetDetailPageProps = {
@@ -50,6 +53,8 @@ export default async function SetDetailPage({
   if (!user) {
     redirect("/login");
   }
+
+  await recordRecentSetVisit(setId);
 
   let set;
   let cards;
@@ -97,6 +102,13 @@ export default async function SetDetailPage({
   const bulkAddedCount = parseCountParam(added);
   const bulkAlreadyOwnedCount = parseCountParam(alreadyOwned);
   const bulkAlreadyWishedCount = parseCountParam(alreadyWished);
+
+  const ownedIdSet = new Set(ownedIds);
+  const wantedIdSet = new Set(wantedIds);
+  const completionStats =
+    cards && cards.length > 0
+      ? computeSetCompletionStats(cards, ownedIdSet, wantedIdSet)
+      : null;
 
   return (
     <div className="flex flex-1 justify-center px-4 py-12">
@@ -213,6 +225,10 @@ export default async function SetDetailPage({
           >
             Could not load wishlist status: {wishlistError.message}
           </p>
+        ) : null}
+
+        {completionStats ? (
+          <SetCompletionStatsPanel stats={completionStats} />
         ) : null}
 
         {set && cards && cards.length === 0 ? (

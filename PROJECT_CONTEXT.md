@@ -129,12 +129,14 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 - **Create listing cleanup:** `/events/[id]/new-listing` accepts sale/trade only; want listings created via Activate Wishlist; legacy want listings unchanged
 - **Set Browser (Phase 1):** protected `/sets` + `/sets/[setId]` — search sets via Pokémon TCG API; browse all cards in a set; status badges (Owned / Wanted / Owned + Wanted / Missing); single-card Add to Collection / Add to Wishlist via existing server actions with `return_path`
 - **Set Browser (Phase 2 — bulk):** checkbox selection, range picker, sticky bulk toolbar; `bulkAddCardsToCollection` / `bulkAddCardsToWishlist` in `app/sets/actions.ts`; batch insert with duplicate skip; summary banner after redirect
+- **Set Browser (Phase 3 — completion & filters):** completion stats + progress bar; client-side All/Owned/Wanted/Missing filters; “Add all missing to Wishlist” quick action via existing bulk wishlist action
+- **Collection Dashboard (Home):** logged-in `/` shows collector dashboard with collection/trading/event stats, continue collecting sets, top wishlist cards, quick actions; guests see landing page
 
 ## Existing routes
 
 | Route | Access | Status |
 |---|---|---|
-| `/` | Public | Landing page |
+| `/` | Public / Dashboard | Landing page for guests; collector dashboard when signed in |
 | `/login` | Public | Auth forms |
 | `/profile` | Protected | Edit your profile |
 | `/users/[id]` | Public | Collector public profile |
@@ -153,8 +155,8 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 
 ## Remaining roadmap
 
-1. **Set Browser (Phase 3+)** — completion statistics, binder mode, “Add all missing to Wishlist”, filters
-2. **Join event** — use `join_code` to associate users with events
+1. **Join event** — use `join_code` to associate users with events
+2. **Set Browser (Phase 4+)** — binder mode, collection unique index for official cards
 3. **Real-time chat / threaded conversations / notifications** — future enhancements (not in MVP)
 
 ## Important implementation decisions

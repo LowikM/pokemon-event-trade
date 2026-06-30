@@ -10,7 +10,13 @@ import { LanguageSelect } from "@/components/LanguageSelect";
 import { SetBrowserCard } from "@/components/SetBrowserCard";
 import { LISTING_CONDITIONS } from "@/lib/listing-filters";
 import type { PokemonTcgSetCard } from "@/lib/pokemon-tcg";
-import { selectCardsInNumericRange } from "@/lib/set-browser";
+import {
+  getMissingWishlistCandidateIds,
+  matchesSetCardFilter,
+  selectCardsInNumericRange,
+  SET_CARD_FILTERS,
+  type SetCardFilter,
+} from "@/lib/set-browser";
 import {
   WISHLIST_PRIORITY_DEFAULT,
   WISHLIST_PRIORITY_LABELS,
@@ -33,6 +39,9 @@ const toolbarButtonClassName =
 const primaryButtonClassName =
   "rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 
+const filterButtonClassName =
+  "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors";
+
 export function SetBrowserGrid({
   cards,
   setId,
@@ -42,6 +51,7 @@ export function SetBrowserGrid({
   const ownedSet = useMemo(() => new Set(ownedIds), [ownedIds]);
   const wantedSet = useMemo(() => new Set(wantedIds), [wantedIds]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [statusFilter, setStatusFilter] = useState<SetCardFilter>("all");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
   const [collectionLanguage, setCollectionLanguage] = useState("");
@@ -50,6 +60,17 @@ export function SetBrowserGrid({
   const [wishlistLanguage, setWishlistLanguage] = useState("");
   const [wishlistPriority, setWishlistPriority] = useState(
     String(WISHLIST_PRIORITY_DEFAULT),
+  );
+
+  const filteredCards = useMemo(() => {
+    return cards.filter((card) =>
+      matchesSetCardFilter(statusFilter, card.id, ownedSet, wantedSet),
+    );
+  }, [cards, ownedSet, wantedSet, statusFilter]);
+
+  const missingWishlistIds = useMemo(
+    () => getMissingWishlistCandidateIds(cards, ownedSet, wantedSet),
+    [cards, ownedSet, wantedSet],
   );
 
   const selectedCount = selectedIds.size;
@@ -71,7 +92,7 @@ export function SetBrowserGrid({
   }
 
   function selectAll() {
-    setSelectedIds(new Set(cards.map((card) => card.id)));
+    setSelectedIds(new Set(filteredCards.map((card) => card.id)));
   }
 
   function clearSelection() {
@@ -101,6 +122,98 @@ export function SetBrowserGrid({
 
   return (
     <>
+      <section className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Filter cards</p>
+          <div className="flex flex-wrap gap-2">
+            {SET_CARD_FILTERS.map((filter) => {
+              const isActive = statusFilter === filter.value;
+
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => setStatusFilter(filter.value)}
+                  className={`${filterButtonClassName} ${
+                    isActive
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <form action={bulkAddCardsToWishlist} className="space-y-3">
+          <input type="hidden" name="return_path" value={returnPath} />
+          <input type="hidden" name="set_id" value={setId} />
+          <input type="hidden" name="language" value={wishlistLanguage} />
+          <input type="hidden" name="priority" value={wishlistPriority} />
+          {missingWishlistIds.map((cardId) => (
+            <input
+              key={`missing-${cardId}`}
+              type="hidden"
+              name="tcg_api_card_ids"
+              value={cardId}
+            />
+          ))}
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Quick action</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Adds every card in this set that is not owned and not already on
+              your wishlist ({missingWishlistIds.length} card
+              {missingWishlistIds.length === 1 ? "" : "s"}).
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label
+                htmlFor="quick-wishlist-language"
+                className="text-xs text-zinc-600 dark:text-zinc-400"
+              >
+                Wishlist language
+              </label>
+              <LanguageSelect
+                id="quick-wishlist-language"
+                className={inputClassName}
+                value={wishlistLanguage}
+                onChange={(event) => setWishlistLanguage(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="quick-wishlist-priority"
+                className="text-xs text-zinc-600 dark:text-zinc-400"
+              >
+                Wishlist priority
+              </label>
+              <select
+                id="quick-wishlist-priority"
+                value={wishlistPriority}
+                onChange={(event) => setWishlistPriority(event.target.value)}
+                className={inputClassName}
+              >
+                {WISHLIST_PRIORITY_OPTIONS.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {WISHLIST_PRIORITY_LABELS[priority]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={missingWishlistIds.length === 0}
+            className={primaryButtonClassName}
+          >
+            Add all missing to Wishlist
+          </button>
+        </form>
+      </section>
+
       <section className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
         <div className="flex flex-wrap gap-2">
           <button
@@ -161,25 +274,31 @@ export function SetBrowserGrid({
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             Range selection only applies to plain numeric collector numbers (for
             example 1–32). Special numbers such as TG01, GG15, or SVP123 are
-            ignored.
+            ignored. Select all applies to the current filter.
           </p>
         </div>
       </section>
 
-      <ul className="grid grid-cols-2 gap-4 pb-28 md:grid-cols-3 lg:grid-cols-4">
-        {cards.map((card) => (
-          <li key={card.id}>
-            <SetBrowserCard
-              card={card}
-              setId={setId}
-              ownedIds={ownedSet}
-              wantedIds={wantedSet}
-              isSelected={selectedIds.has(card.id)}
-              onSelectChange={(checked) => toggleCard(card.id, checked)}
-            />
-          </li>
-        ))}
-      </ul>
+      {filteredCards.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-zinc-300 px-6 py-12 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
+          No cards match this filter.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-2 gap-4 pb-28 md:grid-cols-3 lg:grid-cols-4">
+          {filteredCards.map((card) => (
+            <li key={card.id}>
+              <SetBrowserCard
+                card={card}
+                setId={setId}
+                ownedIds={ownedSet}
+                wantedIds={wantedSet}
+                isSelected={selectedIds.has(card.id)}
+                onSelectChange={(checked) => toggleCard(card.id, checked)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       {selectedCount > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white/95 px-4 py-4 shadow-lg backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">

@@ -19,7 +19,9 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - **Activate wishlist (Phase 2):** protected `/events/[id]/activate-wishlist`; `activateWishlistForEvent` in `app/events/[id]/activate-wishlist/actions.ts`; checklist UI; snapshotted want listings with `wishlist_item_id`
 - **My Wishlist UX:** unique constraints on `wishlist_items`; duplicate error on create; bulk delete/set priority on `/my-wishlist`; activate page filters + select all/none + selected count
 - **Set Browser (Phase 1):** protected `/sets` + `/sets/[setId]`; set search; card grid with Owned/Wanted/Missing badges; single-card add via existing create actions + `return_path`
-- **Set Browser (Phase 2 — bulk):** checkbox selection + highlighted borders; Select all / Clear all / numeric range picker; sticky bulk toolbar with collection + wishlist defaults; `bulkAddCardsToCollection` / `bulkAddCardsToWishlist` in `app/sets/actions.ts`; batch insert, skip duplicates, summary banner
+- **Set Browser (Phase 2 — bulk):** checkbox selection + highlighted borders; Select all / Clear all / numeric range picker; sticky bulk toolbar; `bulkAddCardsToCollection` / `bulkAddCardsToWishlist`
+- **Set Browser (Phase 3 — completion & filters):** `SetCompletionStatsPanel`; All/Owned/Wanted/Missing filters; “Add all missing to Wishlist” quick action
+- **Collection Dashboard (Home):** logged-in `/` via `loadCollectorDashboard` in `lib/dashboard.ts`; `CollectorDashboard` component; recent set cookie on `/sets/[setId]` visits
 - **Listing from collection:** searchable picker prefills form; snapshot on insert + optional `collection_item_id`
 - **Language:** optional dropdown on collection + listings (13 values); snapshotted when creating listings
 - **Pokémon TCG API (Phase A):** `lib/pokemon-tcg.ts`, `GET /api/card-search?q=...` (auth required); optional `POKEMON_TCG_API_KEY`; DB columns `tcg_api_card_id`, `card_number`, `set_id`; no images stored in DB
@@ -28,13 +30,13 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - **Pokémon TCG API (Phase D):** collection API fields snapshotted on listing create; thumbnails + badges on event + My Listings pages via `getCardImagesByIds`
 - **Event listing search & filters:** `/events/[id]` GET form → URL params; Supabase query filtering in `lib/listing-filters.ts` + `EventListingFilters`
 - **Matching engine (V2):** `/my-matches` — `findUserTradeMatches()` in `lib/listing-matches.ts`; grouped by event + user; perfect/strong/direct/reverse categories; no DB table
-- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`, `CardSearchCombobox`, `AddCollectionItemForm`, `AddWishlistItemForm`, `PrioritySelect`, `ActivateWishlistForm`, `WishlistManageList`, `EventListingFilters`, `ListingOfficialCard`, `UserTradeMatchCard`, `SendMessageForm`, `ReplyMessageForm`, `MessageStatusAlert`, `ProfileForm`, `UserProfileLink`, `SetBrowserCard`, `SetBrowserGrid`
+- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`, `CardSearchCombobox`, `AddCollectionItemForm`, `AddWishlistItemForm`, `PrioritySelect`, `ActivateWishlistForm`, `WishlistManageList`, `EventListingFilters`, `ListingOfficialCard`, `UserTradeMatchCard`, `SendMessageForm`, `ReplyMessageForm`, `MessageStatusAlert`, `ProfileForm`, `UserProfileLink`, `SetBrowserCard`, `SetBrowserGrid`, `SetCompletionStatsPanel`, `CollectorDashboard`
 - **Stack:** Next.js 16 App Router, React 19, Tailwind v4, Supabase SSR
 
 ## Build next (priority order)
 
-1. **Set Browser (Phase 3+)** — completion statistics, binder mode, “Add all missing to Wishlist”, filters
-2. **Join event** — use `events.join_code`
+1. **Join event** — use `events.join_code`
+2. **Set Browser (Phase 4+)** — binder mode, collection unique index for official cards
 
 ## Set Browser Phase 1 (done)
 
@@ -113,7 +115,96 @@ Checkbox on every card; selection persists while scrolling; selected cards get a
 5. Bulk add overlapping selection to wishlist — banner shows added + already wished.
 6. Confirm `/my-collection` and `/my-wishlist` rows; single-card buttons still work.
 
-**Remaining (Phase 3+):** completion %, binder mode, “Add all missing to Wishlist”, extra filters, collection unique index for official cards.
+## Set Browser Phase 3 — Completion & Filters (done)
+
+Completion stats panel at top of set detail: total, owned, wanted, missing, completion % (`owned / total`, rounded), and progress bar. Filters above grid: All / Owned / Wanted / Missing — client-side on loaded cards + status sets. Quick action **Add all missing to Wishlist** submits all cards that are not owned and not already wished via `bulkAddCardsToWishlist`; shows existing bulk result banner; skips duplicates.
+
+**Completion calculation** (`computeSetCompletionStats` in `lib/set-browser.ts`):
+
+- **Total** — count of cards loaded from Pokémon TCG API for the set
+- **Owned** — cards with a matching `tcg_api_card_id` in `collection_items`
+- **Wanted** — cards with a matching `tcg_api_card_id` in `wishlist_items` (includes owned + wanted)
+- **Missing** — cards not in collection (`total - owned`)
+- **Completion %** — `Math.round((owned / total) * 100)`
+
+**Filters** (`matchesSetCardFilter`):
+
+- **All** — every card
+- **Owned** — owned or owned + wanted
+- **Wanted** — wanted or owned + wanted
+- **Missing** — not owned and not on wishlist (matches Missing badge)
+
+Select all applies to the active filter; range selection still uses the full set.
+
+**Quick action:** Computes missing wishlist candidates client-side; one form submit → `bulkAddCardsToWishlist` → redirect with `?bulk=wishlist&added=N&alreadyWished=M`. Shares wishlist language/priority with bulk toolbar state.
+
+**Files changed (Phase 3):**
+
+| Area | Files |
+|---|---|
+| Helpers | `lib/set-browser.ts` — `computeSetCompletionStats`, `matchesSetCardFilter`, `getMissingWishlistCandidateIds`, filter constants |
+| Components | `components/SetCompletionStatsPanel.tsx` (new), `components/SetBrowserGrid.tsx` (filters + quick action) |
+| Page | `app/sets/[setId]/page.tsx` — stats panel above grid |
+
+**How to test:**
+
+1. Open a set — confirm stats panel and progress bar match badge counts.
+2. Filter Owned / Wanted / Missing — grid updates; no extra requests.
+3. Click **Add all missing to Wishlist** — banner shows added + already wished counts; `/my-wishlist` updated.
+4. Confirm Phase 2 still works: checkboxes, range, bulk toolbar, single-card buttons.
+
+**Remaining (Phase 4+):** binder mode, collection unique index for official cards.
+
+## Collection Dashboard (Home) (done)
+
+Logged-in users see a collector dashboard at `/`. Guests still see the marketing landing page.
+
+**Sections:** Welcome + display name; Collection stats; Trading stats; Events (upcoming + events with active listings); Continue collecting (up to 5 sets with completion %); Top 10 priority wishlist cards; Quick action links.
+
+**Dashboard queries** (`loadCollectorDashboard` — batched with `Promise.all` where possible):
+
+| Query | Purpose |
+|---|---|
+| `users` profile | Display name |
+| `collection_items` (all rows for user) | Total qty, distinct cards, owned-by-set, activity fallback |
+| `wishlist_items` count | Wishlist total |
+| `wishlist_items` top 10 by priority | Wishlist section |
+| `listing_interests` count | Interested listings |
+| `messages` unread count | Unread messages (`getUnreadMessageCount`) |
+| `events` upcoming (end_date ≥ today, limit 5) | Upcoming events |
+| `listings` active for user | Active listings count, match input, attending events |
+| `listings` active at same events (others) | Match count via `findUserTradeMatches` |
+| `getSet` × up to 5 (cached) | Continue collecting totals |
+| `getCardImagesByIds` (batch) | Wishlist thumbnails |
+
+Recent sets: cookie `pet_recent_sets` updated on `/sets/[setId]` visit; fallback = most recently updated `set_id` from collection/wishlist.
+
+**Statistics shown:**
+
+- Collection: total cards owned (sum of quantity), distinct cards, wishlist items, active listings
+- Trading: active matches, interested listings, unread messages
+- Events: upcoming events list; events where user has active listings (“Events you're listing at”)
+- Continue collecting: set name, owned/total, completion %, progress bar
+- Wishlist: top 10 by priority (1 first), thumbnail, name, set, priority label
+
+**Files changed:**
+
+| Area | Files |
+|---|---|
+| Data | `lib/dashboard.ts`, `lib/recent-sets.ts` |
+| UI | `components/CollectorDashboard.tsx` |
+| Pages | `app/page.tsx`, `app/sets/[setId]/page.tsx` (recent set cookie) |
+
+**How to test:**
+
+1. Sign out → `/` shows landing page.
+2. Sign in → `/` shows dashboard with your display name.
+3. Add collection/wishlist/listings → stats update on refresh.
+4. Visit a set page → return to `/` → set appears under Continue collecting.
+5. Add high-priority wishlist cards → appear in Wishlist section with thumbnails.
+6. Confirm quick action links work.
+
+**Future improvements:** join-code event attendance, dedicated recent-sets DB, dashboard widgets for match highlights, collection value/condition breakdown, redirect login to `/` instead of `/profile`.
 
 ## Supabase schema
 
@@ -163,26 +254,29 @@ Checkbox on every card; selection persists while scrolling; selected cards get a
 | Create listing cleanup | Done |
 | Set Browser (Phase 1) | Done |
 | Set Browser (Phase 2 — bulk) | Done |
+| Set Browser (Phase 3 — completion & filters) | Done |
+| Collection Dashboard (Home) | Done |
 | Join event | Not started |
 
 ## Future: Bulk add cards by set/range
 
-**Phase 2 bulk add is done** on `/sets/[setId]`. Remaining: completion stats, binder mode, “Add all missing to Wishlist”, filters.
+**Phase 2 bulk add and Phase 3 completion/filters/quick action are done** on `/sets/[setId]`. Remaining: binder mode, collection unique index for official cards.
 
-Original planned flow (now partially implemented):
+Original planned flow (now implemented):
 
 1. Search a Pokémon TCG set (e.g. Brilliant Stars).
 2. Select a card number range (e.g. 1–32) or individual numbers.
 3. Add matching cards to **My Wishlist** or **My Collection** in one action.
 
-Blockers for remaining items: completion stats UI, binder layout, collection unique index for official cards.
+Blockers for remaining items: binder layout, collection unique index for official cards.
 
 ## Tips for the next chat
 
 - Run `npm run dev` (Turbopack). Env in `.env.local`.
 - Optional server env: `POKEMON_TCG_API_KEY` (Pokémon TCG Developer Portal; higher rate limits than unauthenticated).
 - Card search: `GET /api/card-search?q=char` while logged in → `{ results: [...] }` with `images.small` for display only (not stored in DB). Future images: `getCardById` / `getCardImagesById` in `lib/pokemon-tcg.ts`.
-- Set browser: `/sets` search; `/sets/[setId]` card grid + bulk toolbar; `bulkAddCardsToCollection` / `bulkAddCardsToWishlist` in `app/sets/actions.ts`; redirect params `bulk`, `added`, `alreadyOwned`, `alreadyWished`; single-card create actions still accept `return_path`
+- Dashboard: logged-in `/` uses `loadCollectorDashboard` in `lib/dashboard.ts`; recent sets cookie `pet_recent_sets` on set page visits
+- Set browser: `/sets` search; `/sets/[setId]` — completion stats, filters, bulk actions; `computeSetCompletionStats` in `lib/set-browser.ts`
 - Create listing: `/events/[id]/new-listing` accepts **sale/trade only**; `createListing` rejects `type=want`; want listings via `activateWishlistForEvent`; legacy want rows kept
 - Listing interests: `addInterest(listingId)` / `removeInterest(listingId)` in `app/listing-interests/actions.ts`; table `listing_interests`.
 - Messages: `sendMessage`, `replyToMessage`, `markMessageRead` in `app/messages/actions.ts`; max body 1000 chars; inbox at `/messages`; unread = `read_at IS NULL`

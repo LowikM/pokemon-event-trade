@@ -1,6 +1,11 @@
 import Link from "next/link";
 
-export default function Home() {
+import { CollectorDashboard } from "@/components/CollectorDashboard";
+import { loadCollectorDashboard } from "@/lib/dashboard";
+import { getCardImagesByIds } from "@/lib/pokemon-tcg";
+import { createClient } from "@/lib/supabase/server";
+
+function LandingPage() {
   return (
     <div className="flex flex-1 justify-center px-4 py-12 sm:py-16">
       <main className="flex w-full max-w-2xl flex-col justify-center gap-10">
@@ -50,4 +55,24 @@ export default function Home() {
       </main>
     </div>
   );
+}
+
+export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return <LandingPage />;
+  }
+
+  const dashboard = await loadCollectorDashboard(supabase, user.id);
+  const cardImagesById = await getCardImagesByIds(
+    dashboard.topWishlist
+      .map((item) => item.tcgApiCardId)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  return <CollectorDashboard data={dashboard} cardImagesById={cardImagesById} />;
 }
