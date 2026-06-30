@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { LanguageSelect } from "@/components/LanguageSelect";
@@ -17,6 +18,7 @@ type CollectionItem = {
 };
 
 type NewListingFormProps = {
+  eventId: string;
   createListing: (formData: FormData) => void | Promise<void>;
   collectionItems: CollectionItem[];
 };
@@ -30,6 +32,7 @@ const ITEM_KIND_LABELS: Record<CollectionItem["item_kind"], string> = {
 };
 
 export function NewListingForm({
+  eventId,
   createListing,
   collectionItems,
 }: NewListingFormProps) {
@@ -76,14 +79,35 @@ export function NewListingForm({
 
   return (
     <div className="space-y-8">
+      <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <p className="text-zinc-700 dark:text-zinc-300">
+          Looking for a card? Add it to My Wishlist and activate your wishlist
+          for this event.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Link
+            href="/my-wishlist"
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-950"
+          >
+            My Wishlist
+          </Link>
+          <Link
+            href={`/events/${eventId}/activate-wishlist`}
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white dark:border-zinc-700 dark:hover:bg-zinc-950"
+          >
+            Activate Wishlist
+          </Link>
+        </div>
+      </section>
+
       <section className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">
             Select from My Collection
           </h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Choose an item to prefill the form below. You can still edit fields
-            before submitting.
+            Choose something you own to prefill a sale or trade listing. You can
+            still edit fields before submitting.
           </p>
         </div>
 
@@ -178,6 +202,10 @@ export function NewListingForm({
           value={selectedCollectionItemId}
         />
 
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Post cards or sealed products you own as a sale or trade listing.
+        </p>
+
         <div className="space-y-2">
           <label htmlFor="type" className="text-sm font-medium">
             Type <span className="text-red-600">*</span>
@@ -192,7 +220,6 @@ export function NewListingForm({
             <option value="" disabled>
               Select a type
             </option>
-            <option value="want">Want</option>
             <option value="trade">Trade</option>
             <option value="sale">Sale</option>
           </select>

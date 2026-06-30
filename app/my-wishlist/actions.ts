@@ -13,6 +13,7 @@ import {
   WISHLIST_PRIORITY_MIN,
   type WishlistFieldData,
 } from "@/lib/wishlist";
+import { getSafeReturnPath } from "@/lib/return-path";
 import { createClient } from "@/lib/supabase/server";
 
 type ExistingWishlistItem = {
@@ -109,9 +110,10 @@ export async function createWishlistItem(formData: FormData) {
   }
 
   const parsed = parseWishlistFields(formData);
+  const returnPath = getSafeReturnPath(formData, "/my-wishlist");
 
   if ("error" in parsed) {
-    redirect(`/my-wishlist?error=${encodeURIComponent(parsed.error)}`);
+    redirect(`${returnPath}?error=${encodeURIComponent(parsed.error)}`);
   }
 
   const duplicateCheck = await findDuplicateWishlistItem(
@@ -121,12 +123,12 @@ export async function createWishlistItem(formData: FormData) {
   );
 
   if ("error" in duplicateCheck && duplicateCheck.error) {
-    redirect(`/my-wishlist?error=${encodeURIComponent(duplicateCheck.error)}`);
+    redirect(`${returnPath}?error=${encodeURIComponent(duplicateCheck.error)}`);
   }
 
   if ("duplicate" in duplicateCheck && duplicateCheck.duplicate) {
     redirect(
-      `/my-wishlist?error=${encodeURIComponent(WISHLIST_DUPLICATE_ERROR)}`,
+      `${returnPath}?error=${encodeURIComponent(WISHLIST_DUPLICATE_ERROR)}`,
     );
   }
 
@@ -138,15 +140,16 @@ export async function createWishlistItem(formData: FormData) {
   if (error) {
     if (isWishlistUniqueViolation(error)) {
       redirect(
-        `/my-wishlist?error=${encodeURIComponent(WISHLIST_DUPLICATE_ERROR)}`,
+        `${returnPath}?error=${encodeURIComponent(WISHLIST_DUPLICATE_ERROR)}`,
       );
     }
 
-    redirect(`/my-wishlist?error=${encodeURIComponent(error.message)}`);
+    redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/my-wishlist");
-  redirect("/my-wishlist");
+  revalidatePath(returnPath);
+  redirect(`${returnPath}?added=wishlist`);
 }
 
 export async function updateWishlistItem(formData: FormData) {

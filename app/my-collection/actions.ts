@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { isCardLanguage } from "@/lib/languages";
+import { getSafeReturnPath } from "@/lib/return-path";
 import { createClient } from "@/lib/supabase/server";
 
 const ITEM_KINDS = ["card", "sealed"] as const;
@@ -140,11 +141,10 @@ export async function createCollectionItem(formData: FormData) {
   }
 
   const parsed = parseCollectionFields(formData);
+  const returnPath = getSafeReturnPath(formData, "/my-collection");
 
   if ("error" in parsed) {
-    redirect(
-      `/my-collection?error=${encodeURIComponent(parsed.error)}`,
-    );
+    redirect(`${returnPath}?error=${encodeURIComponent(parsed.error)}`);
   }
 
   const { error } = await supabase.from("collection_items").insert({
@@ -153,13 +153,12 @@ export async function createCollectionItem(formData: FormData) {
   });
 
   if (error) {
-    redirect(
-      `/my-collection?error=${encodeURIComponent(error.message)}`,
-    );
+    redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/my-collection");
-  redirect("/my-collection");
+  revalidatePath(returnPath);
+  redirect(`${returnPath}?added=collection`);
 }
 
 export async function updateCollectionItem(

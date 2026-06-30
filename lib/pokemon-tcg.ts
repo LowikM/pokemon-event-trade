@@ -4,6 +4,30 @@ const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const SEARCH_SELECT = "id,name,number,set,images";
 const CARD_SELECT = "id,name,number,set,images";
+const SET_SELECT = "id,name,series,releaseDate,total,printedTotal,images";
+
+export type PokemonTcgSetImages = {
+  symbol?: string;
+  logo?: string;
+};
+
+export type PokemonTcgSetSummary = {
+  id: string;
+  name: string;
+  series: string;
+  releaseDate: string;
+  total: number;
+  printedTotal: number | null;
+  images: PokemonTcgSetImages;
+};
+
+export type PokemonTcgSetCard = {
+  id: string;
+  name: string;
+  number: string;
+  set: PokemonTcgCardSet;
+  images: PokemonTcgCardImages;
+};
 
 export type PokemonTcgCardSet = {
   id: string;
@@ -43,6 +67,27 @@ type PokemonTcgApiCard = {
   };
 };
 
+type PokemonTcgApiSet = {
+  id: string;
+  name: string;
+  series?: string;
+  releaseDate?: string;
+  total?: number;
+  printedTotal?: number;
+  images?: {
+    symbol?: string;
+    logo?: string;
+  };
+};
+
+type PokemonTcgPaginatedResponse<T> = {
+  data: T[];
+  page: number;
+  pageSize: number;
+  count: number;
+  totalCount: number;
+};
+
 export class PokemonTcgApiError extends Error {
   status: number;
 
@@ -58,7 +103,25 @@ type SearchCacheEntry = {
   results: PokemonTcgCardSearchResult[];
 };
 
+type SetSearchCacheEntry = {
+  expiresAt: number;
+  results: PokemonTcgSetSummary[];
+};
+
+type SetCacheEntry = {
+  expiresAt: number;
+  set: PokemonTcgSetSummary;
+};
+
+type SetCardsCacheEntry = {
+  expiresAt: number;
+  cards: PokemonTcgSetCard[];
+};
+
 const searchCache = new Map<string, SearchCacheEntry>();
+const setSearchCache = new Map<string, SetSearchCacheEntry>();
+const setCache = new Map<string, SetCacheEntry>();
+const setCardsCache = new Map<string, SetCardsCacheEntry>();
 
 const CARD_NUMBER_PATTERN = /^(\d+)\s*\/\s*(\d+)$/;
 const EMBEDDED_CARD_NUMBER_PATTERN = /(\d+)\s*\/\s*(\d+)/;
@@ -359,6 +422,60 @@ function normalizeCard(card: PokemonTcgApiCard): PokemonTcgCard {
   };
 }
 
+function normalizeSet(set: PokemonTcgApiSet): PokemonTcgSetSummary {
+  return {
+    id: set.id,
+    name: set.name,
+    series: set.series ?? "",
+    releaseDate: set.releaseDate ?? "",
+    total: set.total ?? 0,
+    printedTotal: set.printedTotal ?? null,
+    images: {
+      symbol: set.images?.symbol,
+      logo: set.images?.logo,
+    },
+  };
+}
+
+function normalizeSetCard(card: PokemonTcgApiCard): PokemonTcgSetCard {
+  return normalizeSearchResult(card);
+}
+
+export function buildSetSearchQuery(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const clauses: string[] = [];
+
+  if (/^[a-z0-9-]+$/i.test(trimmed)) {
+    clauses.push(`id:${escapeLuceneTerm(trimmed.toLowerCase())}`);
+  }
+
+  if (trimmed.includes(" ")) {
+    clauses.push(`name:"${escapeLucenePhrase(trimmed)}"`);
+  } else {
+    clauses.push(`name:${escapeLuceneTerm(trimmed)}*`);
+  }
+
+  clauses.push(`series:"${escapeLucenePhrase(trimmed)}"`);
+
+  return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
+}
+
+export function formatSetReleaseDate(date: string) {
+  if (!date) {
+    return "—";
+  }
+
+  return new Date(date).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 async function fetchPokemonTcg<T>(
   path: string,
   searchParams?: Record<string, string>,
@@ -450,6 +567,129 @@ export async function searchCards(
   });
 
   return results;
+}
+
+export async function searchSets(
+  query: string,
+  pageSize = 50,
+): Promise<PokemonTcgSetSummary[]> {
+  const q = buildSetSearchQuery(query);
+  if (!q) {
+    return [];
+  }
+
+  const normalizedPageSize = Math.min(Math.max(pageSize, 1), 250);
+  const cacheKey = `${q}:${normalizedPageSize}`;
+  const cached = setSearchCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.results;
+  }
+
+  const response = await fetchPokemonTcg<PokemonTcgPaginatedResponse<PokemonTcgApiSet>>(
+    "/sets",
+    {
+      q,
+      pageSize: String(normalizedPageSize),
+      orderBy: "-releaseDate",
+      select: SET_SELECT,
+    },
+  );
+
+  const results = (response.data ?? []).map(normalizeSet);
+
+  setSearchCache.set(cacheKey, {
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+    results,
+  });
+
+  return results;
+}
+
+export async function getSet(setId: string): Promise<PokemonTcgSetSummary | null> {
+  const trimmedId = setId.trim();
+  if (!trimmedId) {
+    return null;
+  }
+
+  const cacheKey = trimmedId.toLowerCase();
+  const cached = setCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.set;
+  }
+
+  try {
+    const response = await fetchPokemonTcg<{ data: PokemonTcgApiSet }>(
+      `/sets/${encodeURIComponent(trimmedId)}`,
+      {
+        select: SET_SELECT,
+      },
+    );
+
+    if (!response.data) {
+      return null;
+    }
+
+    const set = normalizeSet(response.data);
+
+    setCache.set(cacheKey, {
+      expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+      set,
+    });
+
+    return set;
+  } catch (error) {
+    if (error instanceof PokemonTcgApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function getCardsForSet(setId: string): Promise<PokemonTcgSetCard[]> {
+  const trimmedId = setId.trim();
+  if (!trimmedId) {
+    return [];
+  }
+
+  const cacheKey = trimmedId.toLowerCase();
+  const cached = setCardsCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.cards;
+  }
+
+  const cards: PokemonTcgSetCard[] = [];
+  let page = 1;
+
+  while (true) {
+    const response = await fetchPokemonTcg<
+      PokemonTcgPaginatedResponse<PokemonTcgApiCard>
+    >("/cards", {
+      q: `set.id:${escapeLuceneTerm(trimmedId)}`,
+      orderBy: "number",
+      pageSize: "250",
+      page: String(page),
+      select: CARD_SELECT,
+    });
+
+    cards.push(...(response.data ?? []).map(normalizeSetCard));
+
+    if (page * response.pageSize >= response.totalCount) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  setCardsCache.set(cacheKey, {
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+    cards,
+  });
+
+  return cards;
 }
 
 export async function getCardById(

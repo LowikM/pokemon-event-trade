@@ -98,7 +98,7 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 
 - Cookie-based Supabase SSR via `lib/supabase/client.ts`, `lib/supabase/server.ts`, `middleware.ts`
 - Middleware calls `getUser()` to refresh sessions and redirect:
-  - unauthenticated `/profile`, `/my-listings`, `/my-interests`, `/my-matches`, `/messages`, `/my-collection`, `/my-wishlist` → `/login`
+  - unauthenticated `/profile`, `/my-listings`, `/my-interests`, `/my-matches`, `/messages`, `/my-collection`, `/my-wishlist`, `/sets` → `/login`
   - authenticated `/login` → `/profile`
 - Server actions in `app/login/actions.ts`: `signIn`, `signUp`, `signOut`
 
@@ -112,7 +112,7 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 - **Listing interests (MVP):** `listing_interests` table; `addInterest` / `removeInterest` server actions; ❤️/✓ UI on listing cards; `/my-interests` page
 - My Listings page (`/my-listings`) — owner's listings with interested users and status updates
 - My Collection page (`/my-collection`) — CRUD for personal `collection_items`
-- Create listing from collection on `/events/[id]/new-listing` — picker prefills form; snapshot + optional `collection_item_id`
+- Create listing from collection on `/events/[id]/new-listing` — sale/trade only; collection picker prefills form; snapshot + optional `collection_item_id`; want listings via Activate Wishlist only
 - Optional card/sealed **language** (dropdown) on collection items and listings; snapshotted on listing create
 - Pokémon TCG API **Phase A**: migration + `lib/pokemon-tcg.ts` + authenticated `GET /api/card-search`
 - Pokémon TCG API **Phase B**: My Collection add form — `CardSearchCombobox` with search/manual toggle for cards
@@ -126,6 +126,9 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 - **My Wishlist (Phase 1):** `wishlist_items` table; protected `/my-wishlist` CRUD; TCG search + manual entry; priority 1–5
 - **Activate wishlist for event (Phase 2):** `listings.wishlist_item_id`; protected `/events/[id]/activate-wishlist`; `activateWishlistForEvent` creates snapshotted `want` listings; partial unique index prevents duplicate active wants per event
 - **My Wishlist UX:** duplicate prevention (unique per user + official/manual card); bulk manage on `/my-wishlist`; bulk activation filters on activate page (priority, language, select all/none, selected count)
+- **Create listing cleanup:** `/events/[id]/new-listing` accepts sale/trade only; want listings created via Activate Wishlist; legacy want listings unchanged
+- **Set Browser (Phase 1):** protected `/sets` + `/sets/[setId]` — search sets via Pokémon TCG API; browse all cards in a set; status badges (Owned / Wanted / Owned + Wanted / Missing); single-card Add to Collection / Add to Wishlist via existing server actions with `return_path`
+- **Set Browser (Phase 2 — bulk):** checkbox selection, range picker, sticky bulk toolbar; `bulkAddCardsToCollection` / `bulkAddCardsToWishlist` in `app/sets/actions.ts`; batch insert with duplicate skip; summary banner after redirect
 
 ## Existing routes
 
@@ -137,19 +140,22 @@ Unique constraint on `(listing_id, user_id)`. Replaces legacy `interests` table.
 | `/users/[id]` | Public | Collector public profile |
 | `/my-collection` | Protected | Personal collection CRUD |
 | `/my-wishlist` | Protected | Permanent wanted cards CRUD |
+| `/sets` | Protected | Set Browser — search Pokémon TCG sets |
+| `/sets/[setId]` | Protected | Set detail — card grid with collection/wishlist status |
 | `/my-listings` | Protected | Owner listings, interested users, status updates |
 | `/my-interests` | Protected | Listings the user has marked as interested |
 | `/my-matches` | Protected | User-centric trade matches grouped by event + collector |
 | `/messages` | Protected | Sent and received messages inbox |
 | `/events` | Public | Event list |
 | `/events/[id]` | Public | Event detail |
-| `/events/[id]/new-listing` | Protected | Create listing form with collection picker |
+| `/events/[id]/new-listing` | Protected | Create sale/trade listing from collection or manual entry |
 | `/events/[id]/activate-wishlist` | Protected | Activate wishlist items as want listings for event |
 
 ## Remaining roadmap
 
-1. **Join event** — use `join_code` to associate users with events
-2. **Real-time chat / threaded conversations / notifications** — future enhancements (not in MVP)
+1. **Set Browser (Phase 3+)** — completion statistics, binder mode, “Add all missing to Wishlist”, filters
+2. **Join event** — use `join_code` to associate users with events
+3. **Real-time chat / threaded conversations / notifications** — future enhancements (not in MVP)
 
 ## Important implementation decisions
 

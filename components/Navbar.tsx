@@ -51,6 +51,12 @@ export async function Navbar() {
                   : ""}
               </Link>
               <Link
+                href="/sets"
+                className="text-zinc-600 transition-colors hover:text-foreground dark:text-zinc-400"
+              >
+                Set Browser
+              </Link>
+              <Link
                 href="/my-collection"
                 className="text-zinc-600 transition-colors hover:text-foreground dark:text-zinc-400"
               >

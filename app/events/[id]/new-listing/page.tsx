@@ -61,7 +61,8 @@ export default async function NewListingPage({
             Create Listing
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            for {event.name}
+            Post cards or sealed products you own for {event.name}. Want listings
+            come from My Wishlist.
           </p>
         </div>
 
@@ -75,6 +76,7 @@ export default async function NewListingPage({
         ) : null}
 
         <NewListingForm
+          eventId={event.id}
           createListing={createListingForEvent}
           collectionItems={collectionItems ?? []}
         />

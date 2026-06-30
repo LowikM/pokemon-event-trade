@@ -6,12 +6,12 @@ import { redirect } from "next/navigation";
 import { isCardLanguage } from "@/lib/languages";
 import { createClient } from "@/lib/supabase/server";
 
-const LISTING_TYPES = ["want", "trade", "sale"] as const;
+const CREATE_LISTING_TYPES = ["trade", "sale"] as const;
 
-type ListingType = (typeof LISTING_TYPES)[number];
+type CreateListingType = (typeof CREATE_LISTING_TYPES)[number];
 
-function isListingType(value: string): value is ListingType {
-  return LISTING_TYPES.includes(value as ListingType);
+function isCreateListingType(value: string): value is CreateListingType {
+  return CREATE_LISTING_TYPES.includes(value as CreateListingType);
 }
 
 function getOptionalText(formData: FormData, name: string) {
@@ -60,9 +60,15 @@ export async function createListing(eventId: string, formData: FormData) {
   const type = formData.get("type");
   const cardName = formData.get("card_name");
 
-  if (typeof type !== "string" || !isListingType(type)) {
+  if (typeof type === "string" && type === "want") {
     redirect(
-      `/events/${eventId}/new-listing?error=${encodeURIComponent("Please select a valid listing type.")}`,
+      `/events/${eventId}/new-listing?error=${encodeURIComponent("Want listings must be created from My Wishlist. Use Activate Wishlist for this event.")}`,
+    );
+  }
+
+  if (typeof type !== "string" || !isCreateListingType(type)) {
+    redirect(
+      `/events/${eventId}/new-listing?error=${encodeURIComponent("Please select sale or trade.")}`,
     );
   }
 
