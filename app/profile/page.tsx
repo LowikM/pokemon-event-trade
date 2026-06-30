@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
 import {
   formatMemberSince,
-  getUserDisplayLabel,
   type PublicUserProfile,
 } from "@/lib/users";
 import { createClient } from "@/lib/supabase/server";

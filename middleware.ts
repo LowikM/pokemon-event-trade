@@ -42,7 +42,9 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.pathname.startsWith("/messages") ||
       request.nextUrl.pathname.startsWith("/my-collection") ||
       request.nextUrl.pathname.startsWith("/my-wishlist") ||
-      request.nextUrl.pathname.startsWith("/sets"))
+      request.nextUrl.pathname.startsWith("/sets") ||
+      request.nextUrl.pathname.endsWith("/new-listing") ||
+      request.nextUrl.pathname.endsWith("/activate-wishlist"))
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

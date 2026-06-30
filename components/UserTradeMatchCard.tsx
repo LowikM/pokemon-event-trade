@@ -12,7 +12,6 @@ import {
   getMatchCategoryDescription,
   MATCH_CATEGORY_LABELS,
   type MatchedCard,
-  type MatchUser,
   type UserTradeMatch,
 } from "@/lib/listing-matches";
 
