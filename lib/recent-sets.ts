@@ -1,5 +1,6 @@
 export const RECENT_SETS_COOKIE = "pet_recent_sets";
 export const RECENT_SETS_MAX = 5;
+export const RECENT_SETS_COOKIE_MAX_AGE = 60 * 60 * 24 * 90;
 
 export function parseRecentSetIds(raw: string | undefined) {
   if (!raw) {
@@ -61,4 +62,17 @@ export function mergeRecentSetIds(
   }
 
   return merged;
+}
+
+export async function recordRecentSetVisit(setId: string) {
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const existing = parseRecentSetIds(cookieStore.get(RECENT_SETS_COOKIE)?.value);
+  const next = pushRecentSetId(existing, setId);
+
+  cookieStore.set(RECENT_SETS_COOKIE, JSON.stringify(next), {
+    path: "/",
+    maxAge: RECENT_SETS_COOKIE_MAX_AGE,
+    sameSite: "lax",
+  });
 }

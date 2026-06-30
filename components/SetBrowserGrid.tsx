@@ -1,20 +1,28 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   bulkAddCardsToCollection,
   bulkAddCardsToWishlist,
 } from "@/app/sets/actions";
 import { LanguageSelect } from "@/components/LanguageSelect";
+import { SetBrowserBinder } from "@/components/SetBrowserBinder";
 import { SetBrowserCard } from "@/components/SetBrowserCard";
 import { LISTING_CONDITIONS } from "@/lib/listing-filters";
 import type { PokemonTcgSetCard } from "@/lib/pokemon-tcg";
 import {
+  BINDER_PAGE_SIZE,
+  clampBinderPage,
+  computeBinderPageSummaries,
+  getBinderPageCards,
+  getBinderPageCount,
   getMissingWishlistCandidateIds,
   matchesSetCardFilter,
   selectCardsInNumericRange,
+  SET_BROWSER_VIEW_STORAGE_KEY,
   SET_CARD_FILTERS,
+  type SetBrowserViewMode,
   type SetCardFilter,
 } from "@/lib/set-browser";
 import {
@@ -42,6 +50,9 @@ const primaryButtonClassName =
 const filterButtonClassName =
   "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors";
 
+const viewToggleClassName =
+  "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors";
+
 export function SetBrowserGrid({
   cards,
   setId,
@@ -52,6 +63,9 @@ export function SetBrowserGrid({
   const wantedSet = useMemo(() => new Set(wantedIds), [wantedIds]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [statusFilter, setStatusFilter] = useState<SetCardFilter>("all");
+  const [viewMode, setViewMode] = useState<SetBrowserViewMode>("grid");
+  const [binderPage, setBinderPage] = useState(1);
+  const [pagesDrawerOpen, setPagesDrawerOpen] = useState(false);
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
   const [collectionLanguage, setCollectionLanguage] = useState("");
@@ -73,9 +87,35 @@ export function SetBrowserGrid({
     [cards, ownedSet, wantedSet],
   );
 
+  const binderPageCount = getBinderPageCount(cards.length, BINDER_PAGE_SIZE);
+  const binderPageSummaries = useMemo(
+    () => computeBinderPageSummaries(cards, ownedSet, BINDER_PAGE_SIZE),
+    [cards, ownedSet],
+  );
+  const binderPageCards = useMemo(
+    () => getBinderPageCards(cards, binderPage, BINDER_PAGE_SIZE),
+    [cards, binderPage],
+  );
+
   const selectedCount = selectedIds.size;
   const returnPath = `/sets/${setId}`;
   const selectedIdList = [...selectedIds];
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SET_BROWSER_VIEW_STORAGE_KEY);
+
+    if (stored === "grid" || stored === "binder") {
+      setViewMode(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(SET_BROWSER_VIEW_STORAGE_KEY, viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    setBinderPage((current) => clampBinderPage(current, binderPageCount));
+  }, [binderPageCount]);
 
   function toggleCard(cardId: string, checked: boolean) {
     setSelectedIds((current) => {
@@ -120,30 +160,64 @@ export function SetBrowserGrid({
     });
   }
 
+  function handleBinderPageChange(page: number) {
+    setBinderPage(clampBinderPage(page, binderPageCount));
+  }
+
   return (
     <>
       <section className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Filter cards</p>
-          <div className="flex flex-wrap gap-2">
-            {SET_CARD_FILTERS.map((filter) => {
-              const isActive = statusFilter === filter.value;
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Filter cards</p>
+            <div className="flex flex-wrap gap-2">
+              {SET_CARD_FILTERS.map((filter) => {
+                const isActive = statusFilter === filter.value;
 
-              return (
-                <button
-                  key={filter.value}
-                  type="button"
-                  onClick={() => setStatusFilter(filter.value)}
-                  className={`${filterButtonClassName} ${
-                    isActive
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setStatusFilter(filter.value)}
+                    className={`${filterButtonClassName} ${
+                      isActive
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">View</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`${viewToggleClassName} ${
+                  viewMode === "grid"
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                }`}
+              >
+                Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("binder")}
+                className={`${viewToggleClassName} ${
+                  viewMode === "binder"
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                }`}
+              >
+                Binder
+              </button>
+            </div>
           </div>
         </div>
 
@@ -236,7 +310,10 @@ export function SetBrowserGrid({
           <p className="text-sm font-medium">Range selection</p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="space-y-1">
-              <label htmlFor="range-from" className="text-xs text-zinc-600 dark:text-zinc-400">
+              <label
+                htmlFor="range-from"
+                className="text-xs text-zinc-600 dark:text-zinc-400"
+              >
                 From
               </label>
               <input
@@ -250,7 +327,10 @@ export function SetBrowserGrid({
               />
             </div>
             <div className="space-y-1">
-              <label htmlFor="range-to" className="text-xs text-zinc-600 dark:text-zinc-400">
+              <label
+                htmlFor="range-to"
+                className="text-xs text-zinc-600 dark:text-zinc-400"
+              >
                 To
               </label>
               <input
@@ -279,11 +359,13 @@ export function SetBrowserGrid({
         </div>
       </section>
 
-      {filteredCards.length === 0 ? (
+      {viewMode === "grid" && filteredCards.length === 0 ? (
         <p className="rounded-xl border border-dashed border-zinc-300 px-6 py-12 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
           No cards match this filter.
         </p>
-      ) : (
+      ) : null}
+
+      {viewMode === "grid" && filteredCards.length > 0 ? (
         <ul className="grid grid-cols-2 gap-4 pb-28 md:grid-cols-3 lg:grid-cols-4">
           {filteredCards.map((card) => (
             <li key={card.id}>
@@ -294,11 +376,33 @@ export function SetBrowserGrid({
                 wantedIds={wantedSet}
                 isSelected={selectedIds.has(card.id)}
                 onSelectChange={(checked) => toggleCard(card.id, checked)}
+                mode="grid"
+                statusFilter={statusFilter}
               />
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
+
+      {viewMode === "binder" ? (
+        <div className="pb-28">
+          <SetBrowserBinder
+            setId={setId}
+            ownedIds={ownedSet}
+            wantedIds={wantedSet}
+            selectedIds={selectedIds}
+            onToggleCard={toggleCard}
+            currentPage={binderPage}
+            pageCount={binderPageCount}
+            pageSummaries={binderPageSummaries}
+            pageCards={binderPageCards}
+            statusFilter={statusFilter}
+            onPageChange={handleBinderPageChange}
+            pagesDrawerOpen={pagesDrawerOpen}
+            onPagesDrawerOpenChange={setPagesDrawerOpen}
+          />
+        </div>
+      ) : null}
 
       {selectedCount > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white/95 px-4 py-4 shadow-lg backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">

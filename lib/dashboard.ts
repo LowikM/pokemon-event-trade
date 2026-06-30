@@ -11,12 +11,11 @@ import { getSet } from "@/lib/pokemon-tcg";
 import {
   mergeRecentSetIds,
   parseRecentSetIds,
-  pushRecentSetId,
   RECENT_SETS_COOKIE,
   RECENT_SETS_MAX,
 } from "@/lib/recent-sets";
+import { createClient } from "@/lib/supabase/server";
 import { getUserDisplayLabel } from "@/lib/users";
-import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -358,18 +357,6 @@ function getAttendingEvents(userListings: ListingRow[]) {
   return [...eventsById.values()].sort((a, b) =>
     a.startDate.localeCompare(b.startDate),
   );
-}
-
-export async function recordRecentSetVisit(setId: string) {
-  const cookieStore = await cookies();
-  const existing = parseRecentSetIds(cookieStore.get(RECENT_SETS_COOKIE)?.value);
-  const next = pushRecentSetId(existing, setId);
-
-  cookieStore.set(RECENT_SETS_COOKIE, JSON.stringify(next), {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 90,
-    sameSite: "lax",
-  });
 }
 
 export async function loadCollectorDashboard(

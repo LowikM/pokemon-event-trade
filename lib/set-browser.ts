@@ -149,3 +149,69 @@ export function parseBulkTcgApiCardIds(formData: FormData) {
     ),
   ];
 }
+
+export const BINDER_PAGE_SIZE = 9;
+export const SET_BROWSER_VIEW_STORAGE_KEY = "pet-set-browser-view";
+
+export type SetBrowserViewMode = "grid" | "binder";
+
+export function getBinderPageCount(
+  cardCount: number,
+  pageSize = BINDER_PAGE_SIZE,
+) {
+  if (cardCount === 0) {
+    return 0;
+  }
+
+  return Math.ceil(cardCount / pageSize);
+}
+
+export function getBinderPageCards<T>(
+  cards: readonly T[],
+  page: number,
+  pageSize = BINDER_PAGE_SIZE,
+) {
+  const pageIndex = Math.max(0, page - 1);
+  const start = pageIndex * pageSize;
+
+  return cards.slice(start, start + pageSize);
+}
+
+export type BinderPageSummary = {
+  page: number;
+  owned: number;
+  total: number;
+  completionPercent: number;
+};
+
+export function computeBinderPageSummaries(
+  cards: readonly { id: string }[],
+  ownedIds: ReadonlySet<string>,
+  pageSize = BINDER_PAGE_SIZE,
+) {
+  const pageCount = getBinderPageCount(cards.length, pageSize);
+  const summaries: BinderPageSummary[] = [];
+
+  for (let page = 1; page <= pageCount; page += 1) {
+    const pageCards = getBinderPageCards(cards, page, pageSize);
+    const owned = pageCards.filter((card) => ownedIds.has(card.id)).length;
+    const total = pageCards.length;
+
+    summaries.push({
+      page,
+      owned,
+      total,
+      completionPercent: total > 0 ? Math.round((owned / total) * 100) : 0,
+    });
+  }
+
+  return summaries;
+}
+
+export function clampBinderPage(page: number, pageCount: number) {
+  if (pageCount <= 0) {
+    return 1;
+  }
+
+  return Math.min(Math.max(page, 1), pageCount);
+}

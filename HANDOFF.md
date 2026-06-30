@@ -21,6 +21,7 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - **Set Browser (Phase 1):** protected `/sets` + `/sets/[setId]`; set search; card grid with Owned/Wanted/Missing badges; single-card add via existing create actions + `return_path`
 - **Set Browser (Phase 2 — bulk):** checkbox selection + highlighted borders; Select all / Clear all / numeric range picker; sticky bulk toolbar; `bulkAddCardsToCollection` / `bulkAddCardsToWishlist`
 - **Set Browser (Phase 3 — completion & filters):** `SetCompletionStatsPanel`; All/Owned/Wanted/Missing filters; “Add all missing to Wishlist” quick action
+- **Set Browser (Phase 4 — binder mode):** Grid/Binder toggle; `SetBrowserBinder`; binder pagination helpers in `lib/set-browser.ts`
 - **Collection Dashboard (Home):** logged-in `/` via `loadCollectorDashboard` in `lib/dashboard.ts`; `CollectorDashboard` component; recent set cookie on `/sets/[setId]` visits
 - **Listing from collection:** searchable picker prefills form; snapshot on insert + optional `collection_item_id`
 - **Language:** optional dropdown on collection + listings (13 values); snapshotted when creating listings
@@ -30,13 +31,13 @@ Read `PROJECT_CONTEXT.md` first. Use the **actual Supabase schema** below — do
 - **Pokémon TCG API (Phase D):** collection API fields snapshotted on listing create; thumbnails + badges on event + My Listings pages via `getCardImagesByIds`
 - **Event listing search & filters:** `/events/[id]` GET form → URL params; Supabase query filtering in `lib/listing-filters.ts` + `EventListingFilters`
 - **Matching engine (V2):** `/my-matches` — `findUserTradeMatches()` in `lib/listing-matches.ts`; grouped by event + user; perfect/strong/direct/reverse categories; no DB table
-- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`, `CardSearchCombobox`, `AddCollectionItemForm`, `AddWishlistItemForm`, `PrioritySelect`, `ActivateWishlistForm`, `WishlistManageList`, `EventListingFilters`, `ListingOfficialCard`, `UserTradeMatchCard`, `SendMessageForm`, `ReplyMessageForm`, `MessageStatusAlert`, `ProfileForm`, `UserProfileLink`, `SetBrowserCard`, `SetBrowserGrid`, `SetCompletionStatsPanel`, `CollectorDashboard`
+- **UI:** `Navbar`, `EventCard`, `ListingInterest`, `NewListingForm`, `LanguageSelect`, `CardSearchCombobox`, `AddCollectionItemForm`, `AddWishlistItemForm`, `PrioritySelect`, `ActivateWishlistForm`, `WishlistManageList`, `EventListingFilters`, `ListingOfficialCard`, `UserTradeMatchCard`, `SendMessageForm`, `ReplyMessageForm`, `MessageStatusAlert`, `ProfileForm`, `UserProfileLink`, `SetBrowserCard`, `SetBrowserGrid`, `SetCompletionStatsPanel`, `SetBrowserBinder`, `CollectorDashboard`
 - **Stack:** Next.js 16 App Router, React 19, Tailwind v4, Supabase SSR
 
 ## Build next (priority order)
 
 1. **Join event** — use `events.join_code`
-2. **Set Browser (Phase 4+)** — binder mode, collection unique index for official cards
+2. **Collection Projects** — implement generic project system (design complete; not coded)
 
 ## Set Browser Phase 1 (done)
 
@@ -153,7 +154,34 @@ Select all applies to the active filter; range selection still uses the full set
 3. Click **Add all missing to Wishlist** — banner shows added + already wished counts; `/my-wishlist` updated.
 4. Confirm Phase 2 still works: checkboxes, range, bulk toolbar, single-card buttons.
 
-**Remaining (Phase 4+):** binder mode, collection unique index for official cards.
+**Remaining after Phase 3:** collection unique index for official cards (Projects system separate).
+
+## Set Browser Phase 4 — Binder Mode (done)
+
+Grid/Binder toggle on `/sets/[setId]` (localStorage key `pet-set-browser-view`, default Grid). Binder shows 9 cards per page (3×3 desktop, 2-column layout on mobile) in collector-number order. Page navigation: Previous/Next, `Page N / M`, jump-to-page input. Desktop sidebar + mobile drawer list every page with owned/total and completion %. Status borders: green owned, blue wanted, green + blue badge owned+wanted, grey dashed missing. Filters, bulk selection, range selection, quick actions, and single-card buttons all work in both views. No extra fetches — client-side pagination over loaded cards.
+
+**Binder architecture:** `SetBrowserGrid` owns shared state (selection, filters, view mode, binder page). `SetBrowserBinder` renders one page + navigation + page overview. `SetBrowserCard` accepts `mode="binder"` for border styling. Helpers in `lib/set-browser.ts`: `BINDER_PAGE_SIZE`, `computeBinderPageSummaries`, `getBinderPageCards`, `clampBinderPage`.
+
+**Performance:** Zero additional server/API requests. Page changes and view toggle are client-only `useMemo` slices over the props `cards` array.
+
+**Files changed:**
+
+| Area | Files |
+|---|---|
+| Helpers | `lib/set-browser.ts` |
+| Components | `components/SetBrowserBinder.tsx` (new), `components/SetBrowserGrid.tsx`, `components/SetBrowserCard.tsx` |
+
+**How to test:**
+
+1. Open a set → default Grid view.
+2. Switch to Binder → page 1 shows first 9 cards in 3×3 (desktop) or 2 columns (mobile).
+3. Navigate pages; jump to page 21 on a large set.
+4. Open Pages drawer (mobile) or sidebar (desktop) → click a page to jump; verify completion %.
+5. Confirm owned/wanted/missing borders and actions still work.
+6. Reload page → Binder preference persists via localStorage.
+7. Test bulk select + toolbar in Binder mode.
+
+**Future improvements:** drag-and-drop reorder, custom binder sizes, Projects integration, page-turn animations, print layout.
 
 ## Collection Dashboard (Home) (done)
 
@@ -255,6 +283,7 @@ Recent sets: cookie `pet_recent_sets` updated on `/sets/[setId]` visit; fallback
 | Set Browser (Phase 1) | Done |
 | Set Browser (Phase 2 — bulk) | Done |
 | Set Browser (Phase 3 — completion & filters) | Done |
+| Set Browser (Phase 4 — binder mode) | Done |
 | Collection Dashboard (Home) | Done |
 | Join event | Not started |
 
@@ -276,7 +305,7 @@ Blockers for remaining items: binder layout, collection unique index for officia
 - Optional server env: `POKEMON_TCG_API_KEY` (Pokémon TCG Developer Portal; higher rate limits than unauthenticated).
 - Card search: `GET /api/card-search?q=char` while logged in → `{ results: [...] }` with `images.small` for display only (not stored in DB). Future images: `getCardById` / `getCardImagesById` in `lib/pokemon-tcg.ts`.
 - Dashboard: logged-in `/` uses `loadCollectorDashboard` in `lib/dashboard.ts`; recent sets cookie `pet_recent_sets` on set page visits
-- Set browser: `/sets` search; `/sets/[setId]` — completion stats, filters, bulk actions; `computeSetCompletionStats` in `lib/set-browser.ts`
+- Set browser: `/sets/[setId]` — Grid/Binder toggle (`pet-set-browser-view` localStorage); binder pagination via `computeBinderPageSummaries` in `lib/set-browser.ts`; completion stats, filters, bulk actions unchanged
 - Create listing: `/events/[id]/new-listing` accepts **sale/trade only**; `createListing` rejects `type=want`; want listings via `activateWishlistForEvent`; legacy want rows kept
 - Listing interests: `addInterest(listingId)` / `removeInterest(listingId)` in `app/listing-interests/actions.ts`; table `listing_interests`.
 - Messages: `sendMessage`, `replyToMessage`, `markMessageRead` in `app/messages/actions.ts`; max body 1000 chars; inbox at `/messages`; unread = `read_at IS NULL`

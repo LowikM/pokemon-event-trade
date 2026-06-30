@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { RecordRecentSetVisit } from "@/components/RecordRecentSetVisit";
 import { SetBrowserGrid } from "@/components/SetBrowserGrid";
 import { SetCompletionStatsPanel } from "@/components/SetCompletionStatsPanel";
-import { recordRecentSetVisit } from "@/lib/dashboard";
 import {
   formatSetReleaseDate,
   getCardsForSet,
@@ -53,8 +53,6 @@ export default async function SetDetailPage({
   if (!user) {
     redirect("/login");
   }
-
-  await recordRecentSetVisit(setId);
 
   let set;
   let cards;
@@ -112,6 +110,7 @@ export default async function SetDetailPage({
 
   return (
     <div className="flex flex-1 justify-center px-4 py-12">
+      <RecordRecentSetVisit setId={setId} />
       <div className="w-full max-w-6xl space-y-8">
         <div className="space-y-2">
           <Link
